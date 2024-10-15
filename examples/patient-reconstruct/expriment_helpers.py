@@ -2,28 +2,36 @@ import os
 from scan_utils import ndarray_from_nifty
 from scipy.ndimage import zoom
 
+import datetime
+import csv
+
 
 def read_patient_data(patient: str, test: bool = False):
 
-    if patient=="STT":
+    if patient == "STT":
         zoom_factors = 0.7
-        visualize_pos = [[0.4,0.45,0.5],[0.55,0.6,0.65],[0.65,0.73,0.81]]
+        visualize_pos = [[0.4, 0.45, 0.5], [
+            0.55, 0.6, 0.65], [0.65, 0.73, 0.81]]
 
-    elif patient=="HR":
+    elif patient == "HR":
         zoom_factors = 1.
-        visualize_pos = [[0.35,0.4,0.45],[0.35,0.4,0.45],[0.35,0.4,0.45]]
+        visualize_pos = [[0.35, 0.4, 0.45], [
+            0.35, 0.4, 0.45], [0.35, 0.4, 0.45]]
 
-    elif patient=="LY":
+    elif patient == "LY":
         zoom_factors = 1.
-        visualize_pos = [[0.15,0.2,0.25],[0.55,0.6,0.65],[0.3,0.35,0.4]]
+        visualize_pos = [[0.15, 0.2, 0.25], [
+            0.55, 0.6, 0.65], [0.3, 0.35, 0.4]]
 
-    elif patient=="XXH":
+    elif patient == "XXH":
         zoom_factors = 1.
-        visualize_pos = [[0.35,0.4,0.45],[0.50,0.55,0.60],[0.40,0.45,0.50]]
+        visualize_pos = [[0.35, 0.4, 0.45], [
+            0.50, 0.55, 0.60], [0.40, 0.45, 0.50]]
 
-    elif patient=="YXB":
+    elif patient == "YXB":
         zoom_factors = 1.
-        visualize_pos = [[0.25,0.3,0.35],[0.50,0.55,0.60],[0.34,0.38,0.42]]
+        visualize_pos = [[0.25, 0.3, 0.35], [
+            0.50, 0.55, 0.60], [0.34, 0.38, 0.42]]
 
     else:
         raise ValueError("No visualize_pos available.")
@@ -57,7 +65,7 @@ def read_patient_data(patient: str, test: bool = False):
         wm, _, _ = ndarray_from_nifty(os.path.join(
             dir_path, patient, f'test_{patient}1_wm_normalized.nii.gz'))
         csf, _, _ = ndarray_from_nifty(os.path.join(
-        dir_path, patient, f'test_{patient}1_csf_normalized.nii.gz'))
+            dir_path, patient, f'test_{patient}1_csf_normalized.nii.gz'))
         # tumor_id = 1
         tumor1, _, _ = ndarray_from_nifty(os.path.join(
             dir_path, patient, f'test_{patient}1_tumor_resized.nii.gz'))
@@ -89,3 +97,28 @@ def read_patient_data(patient: str, test: bool = False):
         "header": header,
         "visualize_pos": visualize_pos,
     }
+
+
+def append_parameters_to_file(file_path, patient, experiment_type, D, rho, x0):
+    current_datetime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    new_row = [current_datetime, patient,
+               experiment_type, D, rho, x0[0], x0[1], x0[2]]
+
+    # Read existing content
+    existing_rows = []
+    try:
+        with open(file_path, 'r', newline='') as f:
+            reader = csv.reader(f, delimiter='\t')
+            existing_rows = list(reader)
+    except FileNotFoundError:
+        # If file doesn't exist, create it with a header
+        existing_rows = [["Datetime", "Patient", "Experiment Type",
+                          "D", "rho", "x0[0]", "x0[1]", "x0[2]"]]
+
+    # Insert new row at the beginning (after header)
+    existing_rows.insert(1, new_row)
+
+    # Write updated content back to file
+    with open(file_path, 'w', newline='') as f:
+        writer = csv.writer(f, delimiter='\t')
+        writer.writerows(existing_rows)

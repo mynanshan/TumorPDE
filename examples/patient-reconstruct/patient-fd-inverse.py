@@ -72,7 +72,7 @@ import json
 from datetime import datetime
 
 from scan_utils import visualize_model_fit, visualize_model_fit_multiscan, weighted_center
-from read_patient_data import read_patient_data
+from expriment_helpers import read_patient_data, append_parameters_to_file
 
 ## ============================================================
 ##                         Load data
@@ -104,6 +104,8 @@ tumor1 = data["tumor1"]
 tumor2 = data["tumor2"]
 visualize_pos = data["visualize_pos"]
 del data
+
+paramfile_path = os.path.join(dir_path, "parameters.txt")
 
 print(f"Tumor array shape: {tumor1.shape}")
 print(f"Brain array shape: {brain_raw.shape}")
@@ -190,6 +192,10 @@ if args.single_scan == 1:
                     "slice_fracs": visualize_pos, "show": False, "main_title": patient},
         save_all=False)
 
+    append_parameters_to_file(
+        paramfile_path, patient, "single scan",
+        result['D'], result['rho'], result['x0'])
+
 if args.multi_scan == 1:
 
     print("Calibrating model for multi-scan")
@@ -211,7 +217,6 @@ if args.multi_scan == 1:
         D = {result['D']}, rho={result['rho']}, x0={result['x0']}
         t_scan = {result['t_scan']}
     """)
-
     # Load the scan dates from the JSON file
     with open(os.path.join(dir_path, "scan-dates.json"),
               'r', encoding='utf-8') as f:
@@ -248,3 +253,10 @@ if args.multi_scan == 1:
                     "slice_fracs": visualize_pos, "show": False,
                     "main_title": patient},
         save_all=False)
+
+    append_parameters_to_file(
+        paramfile_path, patient, "multi scan",
+        result['D'], result['rho'], result['x0'])
+
+
+
