@@ -1,0 +1,9 @@
+\begin{thebibliography}{xx}
+
+\harvarditem[Lu et~al.]{Lu, Meng, Mao \harvardand\
+  Karniadakis}{2021}{lu2021deepxde}
+Lu, L., Meng, X., Mao, Z. \harvardand\ Karniadakis, G.~E.  \harvardyearleft
+  2021\harvardyearright , `Deepxde: A deep learning library for solving
+  differential equations', {\em SIAM review} {\bf 63}(1),~208--228.
+
+\end{thebibliography}

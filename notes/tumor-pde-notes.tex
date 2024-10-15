@@ -1,0 +1,428 @@
+\documentclass[12pt]{article}
+% general
+\usepackage{enumerate}
+\usepackage{enumitem}
+
+% figure and table
+\usepackage{graphicx}
+\graphicspath{ {../figures/} }
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{tabularx}
+\usepackage{multirow}
+\usepackage{booktabs}
+\usepackage[ruled]{algorithm2e}
+% \SetKwInput{KwInit}{Initialize}
+% \SetKwInput{KwInput}{Input}
+% \SetKwInput{KwOutput}{Output}
+% \SetKwComment{Comment}{/* }{ */}
+\usepackage{siunitx}
+\usepackage{makecell}
+
+% citation
+\usepackage{natbib}
+\usepackage{url} % not crucial - just used below for the URL 
+
+% math
+\usepackage{amsthm,amssymb,bm,bbm}
+\usepackage{mathtools}  % colon-equality
+
+\newcommand{\tP}{\text{P}}
+\newcommand{\tE}{\text{E}}
+\newcommand{\tVar}{\text{var}}
+\newcommand{\tCov}{\text{cov}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\var}{\text{Var}}
+\newcommand{\cov}{\text{cov}}
+
+\newcommand{\ba}{\mathbf{a}}
+\newcommand{\bb}{\mathbf{b}}
+\newcommand{\bd}{\mathbf{d}}
+\newcommand{\bg}{\mathbf{g}}
+\newcommand{\bn}{\mathbf{n}}
+\newcommand{\bt}{\mathbf{t}}
+\newcommand{\bu}{\mathbf{u}}
+\newcommand{\bv}{\mathbf{v}}
+\newcommand{\bs}{\mathbf{s}}
+\newcommand{\bx}{\mathbf{x}}
+\newcommand{\by}{\mathbf{y}}
+\newcommand{\bz}{\mathbf{z}}
+\newcommand{\bB}{\mathbf{B}}
+\newcommand{\bC}{\mathbf{C}}
+\newcommand{\bG}{\mathbf{G}}
+\newcommand{\bH}{\mathbf{H}}
+\newcommand{\bI}{\mathbf{I}}
+\newcommand{\bQ}{\mathbf{Q}}
+\newcommand{\bR}{\mathbf{R}}
+\newcommand{\bS}{\mathbf{S}}
+\newcommand{\bT}{\mathbf{T}}
+\newcommand{\bU}{\mathbf{U}}
+\newcommand{\bW}{\mathbf{W}}
+\newcommand{\bX}{\mathbf{X}}
+\newcommand{\bY}{\mathbf{Y}}
+\newcommand{\bZ}{\mathbf{Z}}
+\newcommand{\balpha}{\bm{\alpha}}
+\newcommand{\bbeta}{\bm{\beta}}
+\newcommand{\btheta}{\bm{\theta}}
+\newcommand{\blambda}{\bm{\lambda}}
+\newcommand{\bmu}{\bm{\mu}}
+\newcommand{\bphi}{\bm{\phi}}
+\newcommand{\bpsi}{\bm{\psi}}
+\newcommand{\bxi}{\bm{\xi}}
+\newcommand{\bmeta}{\bm{\eta}}
+\newcommand{\bomega}{\bm{\omega}}
+\newcommand{\bGamma}{\mathbf{\Gamma}}
+\newcommand{\bDelta}{\mathbf{\Delta}}
+\newcommand{\bLambda}{\mathbf{\Lambda}}
+\newcommand{\bTheta}{\mathbf{\Theta}}
+\newcommand{\bSigma}{\mathbf{\Sigma}}
+\newcommand{\bPhi}{\mathbf{\Phi}}
+\newcommand{\bPsi}{\mathbf{\Psi}}
+\newcommand{\bOmega}{\mathbf{\Omega}}
+
+\newcommand{\calC}{\mathcal{C}}
+\newcommand{\calK}{\mathcal{K}}
+\newcommand{\calL}{\mathcal{L}}
+\newcommand{\calM}{\mathcal{M}}
+\newcommand{\calP}{\mathcal{P}}
+\newcommand{\calR}{\mathcal{R}}
+\newcommand{\calS}{\mathcal{S}}
+\newcommand{\calT}{\mathcal{T}}
+
+\newcommand{\rmd}{\mathrm{d}}
+\newcommand{\rmtr}{\mathrm{tr}}
+\newcommand{\rmdiag}{\mathrm{diag}}
+\newcommand{\rmvec}{\mathrm{vec}}
+\newcommand{\rmsym}{\mathrm{sym}}
+\newcommand{\rmchol}{\mathrm{chol}}
+\newcommand{\rmgrad}{\mathrm{grad}\,}
+\newcommand{\rmhess}{\mathrm{Hess}\,}
+\newcommand{\rmSt}{\mathrm{St}}
+\newcommand{\rmQf}{\mathrm{Qf}}
+\newcommand{\tst}{\textrm{s.t.}}
+\newcommand{\tstfull}{\textrm{subject to}}
+\newcommand{\ttcv}{\texttt{CV}}
+\newcommand{\ttgcv}{\texttt{GCV}}
+
+\newcommand{\wh}{\widehat}
+\newcommand{\wt}{\widetilde}
+
+\newcommand{\pp}{\partial}
+\newcommand{\stg}{\rmSt_{\bG}(R, p)}
+
+\DeclareMathOperator*{\argmin}{arg\,min}
+\DeclareMathOperator*{\argmax}{arg\,max}
+
+
+
+% Template Default Settings ------------------------
+%\pdfminorversion=4
+% NOTE: To produce blinded version, replace "0" with "1" below.
+\newcommand{\blind}{0}
+
+% DON'T change margins - should be 1 inch all around.
+\addtolength{\oddsidemargin}{-.5in}%
+\addtolength{\evensidemargin}{-1in}%
+\addtolength{\textwidth}{1in}%
+\addtolength{\textheight}{1.7in}%
+\addtolength{\topmargin}{-1in}%
+
+\begin{document}
+
+%\bibliographystyle{natbib}
+
+\def\spacingset#1{\renewcommand{\baselinestretch}%
+{#1}\small\normalsize} \spacingset{1}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\if1\blind
+{
+  \title{\bf Title}
+  \author{Author 1\thanks{
+    The authors gratefully acknowledge \textit{please remember to list all relevant funding sources in the unblinded version}}\hspace{.2cm}\\
+    Department of YYY, University of XXX\\
+    and \\
+    Author 2 \\
+    Department of ZZZ, University of WWW}
+  \maketitle
+} \fi
+
+\if0\blind
+{
+  \bigskip
+  \bigskip
+  \bigskip
+  \begin{center}
+    {\LARGE\bf Tumor Model}
+\end{center}
+  \medskip
+} \fi
+
+\bigskip
+\begin{abstract}
+The text of your abstract. 200 or fewer words.
+\end{abstract}
+
+\noindent%
+{\it Keywords:}  3 to 6 keywords, that do not appear in the title
+\vfill
+
+\newpage
+\spacingset{1.9} % DON'T change the spacing!
+
+
+\section{Introduction}
+\label{sec:intro}
+
+This section describes the proposed biomechanical model for glioma progression, mass effect, and intracranial pressure (ICP) dynamics in the patient-specific brain anatomy. The physics of the underlying process can be summarized as follows. The tumor proliferates and infiltrates the surrounding brain tissue, which consists of white matter, grey matter, and cerebrospinal fluid (CSF). The brain tissue is assumed to consist of viscoelastic materials, where distinct tissue constituents are characterized by different mechanical properties. The growing tumor exerts pressure on the surrounding brain tissue. The pressure is partially relaxed by the brain tissue, depending on the tissue-specific mechanical properties, while the remaining pressure results in tissue deformation and compression. This mechanism entails three coupled processes: (i) tumor dynamics, (ii) pressure dynamics, and (iii) tissue dynamics. These represent the three main components of the model described in the following subsections.
+
+To facilitate the model description, the rest of this paragraph outlines the notation and assumptions. The model is solved in the patient-specific brain anatomy reconstructed from magnetic resonance imaging (MRI) scans, where each image voxel corresponds to one simulation grid point. The letter \( i \in \{1, \ldots, N\} \) denotes an index across all \( N \) voxels of the MRI scan. It is assumed that the tumor cells infiltrate only white and grey matter, whereas the pressure affects all the tissues in the brain parenchyma. According to this assumption, we consider three distinct simulation domains: \( \Omega_1(t) \subset \mathbb{R}^3 \), a domain consisting of white and grey matter only; \( \Omega_2 \subset \mathbb{R}^3 \), a domain including white matter, grey matter, and CSF (i.e., the whole brain parenchyma); \( \Omega_3 \subset \mathbb{R}^3 \), a regular domain containing the brain parenchyma and skull (e.g., whole brain scan). Figure 1 shows the three simulation domains, and it is assumed that \( \Omega_1(t) \subset \Omega_2 \subset \Omega_3 \). We note that the border of the domain \( \Omega_1(t) \) changes over time \( t \) as a result of the tumor-induced changes, such as tissue displacement. On the other hand, the borders of the domains \( \Omega_2 \) and \( \Omega_3 \) are constant over time, since \( \Omega_2 \) is constrained by a rigid skull and \( \Omega_3 \) is defined as a fixed domain. To distinguish the different scopes of model variables, the following labeling is used: the field variables defined at every voxel, such as tumor cell density, are marked by bold letters, e.g., \(\bx\); the vectors of field variables, such as deformation rate, are denoted by bold letters with an arrow, e.g., \(\vec{\bx}\); scalar variables, such as the proliferation rate, are marked by non-bold letters, e.g., \( x \). 
+
+
+
+\section{Tumor Infiltration Model}
+\label{sec:model-inftr}
+
+\begin{table}[htbp]
+    \centering
+    \begin{tabular}{c|l|c|l}
+        \toprule
+        \textbf{Symbol} & \textbf{Description} & \textbf{Symbol} & \textbf{Description} \\
+        \midrule
+        % $\Omega$ & Brain domain & $\pp\Omega$ & Brain surface \\
+        $ \bx $ & Spatial location $(x,y,z)$ & $t$ & Time \\
+        $ D(\bx) $ & Diffusivity & $d(\bx)$ & Diffusivity field \\
+        $ \alpha $ & Diffusivity factor & $\rho$ & Proliferation rate \\
+        $ \bx_0 $ & Tumor onset location $(x_0,y_0,z_0)$ & $f(\bx_0)$ & Initial tumor cell density \\
+        $ u(\bx, t) $ & Tumor cell density & $Y_k$ & The $k$-th brain scan \\
+        \bottomrule
+    \end{tabular}
+    \caption{Table of notations.}
+    \label{tab:notations}
+\end{table}
+
+\noindent \textbf{Model Assumptions}:
+\begin{itemize}[noitemsep,topsep=0pt,leftmargin=*]
+\item The tumor cells infiltrate only white and grey matter.
+\item The tumor does not cause deformation of the brain tissue.
+\end{itemize}
+
+\noindent\textbf{Notation and parameters}:
+\begin{itemize}[leftmargin=*,noitemsep,topsep=0pt]
+    \item See Table \ref{tab:notations} for notations and parameters.
+    \item Diffusivity field, $D(\bx) = \alpha d(\bx)$. The $d(\bx)$ is a predetermined diffusivity field, and is set by default as
+    \[ d(\bx) = r_w(\bx) + 0.1 r_g(\bx), \]
+    where $r_w$ and $r_g$ are the percentages of white and grey matter, respectively.
+    \item Learnable model parameters, $\alpha, \rho, \bx_0$, and the observation time $t_k$ for $k = 1, \ldots, K$.
+\end{itemize}
+
+\noindent\textbf{State equations}:
+\begin{equation}
+\begin{split}
+\begin{cases}
+    \pp_t u = \nabla \cdot (D \nabla u) + \rho u (1 - u), & \bx \in \Omega_1,\ t > 0, \\
+    \nabla u \cdot \bn = 0, & \bx \in \pp\Omega_1,\ t > 0, \\
+    u|_{t=0} = f(\bx_0). &
+\end{cases}
+\end{split}
+\end{equation}
+
+\noindent\textbf{Sensitivity equations}:
+
+\begin{itemize}[leftmargin=*,noitemsep,topsep=0pt]
+\item Let $\phi$ be $\pp u / \pp \alpha$:
+\begin{equation}
+\begin{split}
+\begin{cases}
+    \pp_t \phi = \nabla \cdot (d \nabla u) + \nabla \cdot (D \nabla \phi) + \rho (1 - 2u) \phi, & \bx \in \Omega_1,\ t > 0, \\
+    \nabla \phi \cdot \bn = 0, & \bx \in \pp\Omega_1,\ t > 0, \\
+    \phi|_{t=0} = 0. &
+\end{cases}
+\end{split}
+\end{equation}
+
+\item Let $\psi$ be $\pp u / \pp \rho$:
+\begin{equation}
+\begin{split}
+\begin{cases}
+    \pp_t \psi = \nabla \cdot (D \nabla \psi) + u(1 - u) + \rho (1 - 2u) \psi, & \bx \in \Omega_1,\ t > 0, \\
+    \nabla \psi \cdot \bn = 0, & \bx \in \pp\Omega_1,\ t > 0, \\
+    \psi|_{t=0} = 0. &
+\end{cases}
+\end{split}
+\end{equation}
+
+\item Let $\bmeta=(\eta_x,\eta_y,\eta_z)$ be $\pp u / \pp \bx_0$. For $s\in\{x,y,z\}$:
+\begin{equation}
+\begin{split}
+\begin{cases}
+    \pp_t \eta_s = \nabla \cdot (D \nabla \eta_s) + \rho (1 - 2u) \eta_s, & \bx \in \Omega_1,\ t > 0, \\
+    \nabla \eta_s \cdot \bn = 0, & \bx \in \pp\Omega_1,\ t > 0, \\
+    \eta_s|_{t=0} = \dfrac{\rmd f(\bx_0)}{\rmd \bx_0}. &
+\end{cases}
+\end{split}
+\end{equation}
+
+\end{itemize}
+
+\noindent\textbf{Loss function and gradient}:
+\begin{itemize}[leftmargin=*,noitemsep,topsep=0pt]
+    \item Suppose the brain scans are stored as $m$ voxels, and $x_j \in \Omega$ for $j = 1, \ldots, m$ are the voxel positions.
+    \item Let $U(t)$ be $u(\cdot, t)$ evaluated on the voxel positions of the brain scans.
+    \item Loss function: $l(y, u; \theta)$, $\theta$ denotes potential adjustable parameter in the loss function.
+    \item Total loss function:
+    \begin{equation}
+    \begin{split}
+    J_k(u, t_k, \theta) = \frac{1}{m} \sum_{j=1}^m l(Y_{kj}, u(x_j, t_k); \theta),\\
+    J(u, t_1, \ldots, t_K, \theta) = \frac{1}{K} \sum_{k=1}^K J_k(u, t_k, \theta)
+    \end{split}
+    \end{equation}
+    \item Gradient to model parameters:
+    \begin{equation}
+    \begin{split}
+    \frac{\rmd J}{\rmd \alpha} = \frac{1}{Km} \sum_{j=1}^m \sum_{k=1}^K \bigg(\frac{\pp l}{\pp u} \phi\bigg)\bigg|_{\substack{t=t_k,\\x=x_j}}, \\
+    \frac{\rmd J}{\rmd \rho} = \frac{1}{Km} \sum_{j=1}^m \sum_{k=1}^K \bigg(\frac{\pp l}{\pp u} \psi\bigg)\bigg|_{\substack{t=t_k\\x=x_j}}, \\
+    \frac{\rmd J}{\rmd x_0} = \frac{1}{Km} \sum_{j=1}^m \sum_{k=1}^K \bigg(\frac{\pp l}{\pp u} \eta\bigg)\bigg|_{\substack{t=t_k\\x=x_j}},
+    \end{split}
+    \end{equation} 
+    and the gradient to $\theta$:
+    \begin{equation}
+    \frac{\rmd J}{\rmd \theta} = \frac{1}{Km} \sum_{j=1}^m \sum_{k=1}^K \bigg(\frac{\pp l}{\pp \theta} \bigg)\bigg|_{\substack{t=t_k\\x=x_j}}.
+    \end{equation}
+\end{itemize}
+
+\noindent\textbf{Optimization}:
+
+\begin{equation}
+\begin{split}
+\min_{\substack{\alpha, \rho, x_0, \theta \\ t_1, \ldots, t_K}} &\quad J(u, t_1, \ldots, t_K, \theta) \\
+\tst &\quad  \alpha \geq 0, \ \rho \geq 0, \  x_0 \in \Omega, \\
+&\quad t_k \in (0, 1] \text{ for } k = 1, \ldots, K.
+\end{split}
+\end{equation}
+
+\begin{itemize}[noitemsep,topsep=0pt,leftmargin=*]
+\item Solution: Block coordinate descent,
+\begin{enumerate}[leftmargin=*,noitemsep,topsep=0pt]
+    \item Gradient-based method for $\alpha, \rho, x_0$.
+    \item Minimize w.r.t. $t_k$ for fixed $\alpha, \rho, x_0$.
+    \item Minimize w.r.t. $\theta$ for fixed $\alpha, \rho, x_0, t_1, \ldots, t_K$.
+\end{enumerate}
+\end{itemize}
+
+\noindent\textbf{Discretization scheme}:
+
+\[ \frac{\pp u}{\pp t} = \nabla \cdot (D \nabla u) + \rho u (1 - u) \]
+
+\[ \nabla \cdot (D \nabla u) = \pp_x (D \pp_x u) + \pp_y (D \pp_y u) + \pp_z (D \pp_z u) \]
+
+\begin{align*}
+\pp_x u\bigg(x + \frac{1}{2}\Delta x, y, z\bigg) = \frac{1}{\Delta x}[ u(x + \Delta x, y, z) - u(x, y, z) ], \\
+\pp_x u\bigg(x - \frac{1}{2}\Delta x, y, z\bigg) = \frac{1}{\Delta x}[ u(x, y, z) - u(x - \Delta x, y, z) ]. \\
+\end{align*}
+
+\begin{align*}
+\pp_x (D \pp_x u) & \approx \frac{1}{\Delta x} \bigg[ D\bigg(x+\frac{1}{2}\Delta x, y, z\bigg) \pp_x u\bigg(x + \frac{1}{2}\Delta x, y, z\bigg) - D\bigg(x-\frac{1}{2}\Delta x, y, z\bigg) \pp_x u\bigg(x - \frac{1}{2}\Delta x, y, z\bigg) \bigg] \\
+& \approx \frac{1}{( \Delta x )^2} \bigg[ D\bigg(x+\frac{1}{2}\Delta x, y, z\bigg) \bigg\{ u(x + \Delta x, y, z) - u(x, y, z) \bigg\} -
+\\ & \qquad\qquad\qquad\qquad D\bigg(x-\frac{1}{2}\Delta x, y, z\bigg) \bigg\{ u(x, y, z) - u(x - \Delta x, y, z) \bigg\} \bigg]
+\end{align*}
+
+Approximate the ``half-grid'' values with the ``full-grid'' values:
+\begin{align*}
+D\bigg(x+\frac{1}{2}\Delta x, y, z\bigg) & \approx \frac{1}{2} [D(x + \Delta x, y, z) + D(x, y, z)], \\
+D\bigg(x-\frac{1}{2}\Delta x, y, z\bigg) & \approx \frac{1}{2} [D(x, y, z) + D(x - \Delta x, y, z)].
+\end{align*}
+
+Denote
+\begin{align*}
+D_x^+ = D(x + \Delta x, y, z), \quad D_x^- = D(x - \Delta x, y, z), \\
+u_x^+ = u(x + \Delta x, y, z), \quad u_x^- = u(x - \Delta x, y, z).
+\end{align*}
+
+Then, we can have:
+\begin{align*}
+\pp_x (D \pp_x u) & \approx \frac{1}{2( \Delta x )^2} \bigg[ ( D_x^+ D ) u_x^+ + (D_x^- + D) u_x^- - (D_x^+ + D ) u - (D_x^- + D) u \bigg] \\
+& = \frac{1}{2( \Delta x )^2} \bigg[ ( D_x^+ + D) (u_x^+ - u) + (D_x^- + D) (u_x^- - u) \bigg].
+\end{align*}
+
+$\pp_y (D \pp_y u)$ and $\pp_z (D \pp_z u)$ can be derived similarly.
+
+Other discretization used in the algorithm is trivial.
+
+
+\section{Brain Deformation Model}
+
+\subsection{Tumor Dynamics}
+The glioma dynamic consists of tumor proliferation and infiltration into the surrounding brain tissue.
+% Let \( u_i(t) \in [0, 1] \) be a normalized tumor cell density at time \( t \) and voxel \( i \in \{1, \ldots, N\} \) at location \((i_x, i_y, i_z) \in \Omega_1(t)\). The dynamics of the tumor cell density \( \bu := \{u_i(t)\}_{i=1}^N \) in the brain tissue \( \Omega_1(t) \) is modeled as:
+\begin{align}
+    \pp_t u &= \nabla \cdot (D \nabla u) + \rho u (1 - u) - \bv \cdot \nabla u \quad \text{in } \Omega_1(t), \label{eq:tumor-dynamics} \\
+    \nabla u \cdot \bn &= 0 \quad \text{on } \partial \Omega_1(t), \label{eq:no-flux} \\
+    u(t = 0) &= u_0 \quad \text{in } \Omega_1(t = 0). \label{eq:initial-condition}
+\end{align}
+
+The first term on the right-hand side of equation \eqref{eq:tumor-dynamics} describes tumor infiltration into the surrounding brain tissue.
+% where \( D = \{D_i(t) \bI\}_{i=1}^N \) is a tissue-dependent tensor, \(\bI\) is a \( 3 \times 3 \) identity matrix, and
+% \begin{align}
+%     D_i(t) = 
+%     \begin{cases} 
+%       p_w^i(t) D_w + p_g^i(t) D_g, & \text{for } i \in \Omega_1(t), \\
+%       0, & \text{for } i \notin \Omega_1(t),
+%     \end{cases}
+% \end{align}
+% where \( p_w^i(t) \) and \( p_g^i(t) \) denote the percentage of the white and grey matter at voxel \( i \) at time \( t \). The constants \( D_w \) and \( D_g \) describe the tumor infiltration rate in white and grey matter, respectively. Since the tumor cells infiltrate the white matter faster than the grey matter, it is assumed that \( D_w = 10 D_g \; (\si{cm^2/day}) \).
+
+The second term on the right-hand side of equation \eqref{eq:tumor-dynamics} describes self-limiting tumor proliferation, where \( \rho \; (\si{1/day}) \) is the proliferation rate. As the tumor grows, it exerts pressure on the surrounding tissue, which is deformed and displaced in response. The last term in equation \eqref{eq:tumor-dynamics} represents the displacement of infiltrated tumor cells in the deforming brain tissue, where \( \bv(\bx, t) = (v_x(\bx, t), v_y(\bx, t), v_z(\bx, t)) \) is the displacement rate. The skull and CSF act as boundaries with a no-flux condition as in equation \eqref{eq:no-flux}, where \( \bn \) is the unit outward normal to \( \partial \Omega_1(t) \). The tumor is initialized as a point source at voxel \( \bx_0 \in \Omega_1(t = 0) \) and its growth is modeled from \( t = 0 \) to \( t = T \; (\si{days}) \).
+
+\subsection{Pressure Dynamics}
+
+The pressure dynamics are determined by the growing tumor pressing on the surrounding brain tissue and the mechanical properties of the individual tissue constituents. The brain tissue acts as a viscoelastic material that partially relaxes the pressure from the tumor. The pressure relaxation is proportional to the tissue-specific mechanical properties—the softer the material, the more pressure it relaxes. The remaining pressure results in tissue deformation. The deformation rate can be computed from the pressure gradient using Darcy's law. Let \(\bv\) denote the deformation rate. For the pressure term, we assume that \( \wt p_0(\bx) \) is the patient's normal pressure before the onset of the tumor and \( \wt p(\bx, t) \) is the patient's pressure with the tumor at time \( t \). The tumor-induced pressure \( p(\bx, t) \) is then given as \( p(\bx, t) = \wt p(\bx, t) - \wt p_0(\bx) \). Since the exact values of the patient's normal pressure are not known, we assume \( \wt p_0(\bx) = 0 \) and use the following equations to simulate the dynamics of the tumor-induced pressure \( p(\bx, t) \) in the domain \( \Omega_2 \):
+
+\begin{align}
+    \bv &= -\calM \nabla p \quad \text{in } \Omega_2, \label{eq:darcy} \\
+    \nabla \cdot \bv &= \rho u(1 - u) - \kappa p \quad \text{in } \Omega_2, \label{eq:continuity} \\
+    \bv &= 0 \quad \text{on } \partial \Omega_2. \label{eq:boundary-conditions}
+\end{align}
+
+The parameter \( \calM \), referred to as hydraulic conductivity, describes the ease with which the pressure passes through the tissue. The pressure relaxation is described by the parameter \(\kappa\), where
+\begin{align}
+    \kappa(t) = 
+    \begin{cases} 
+      p_w(t) \kappa_w + p_g(t) \kappa_g + p_c(t) \kappa_c, & \text{for } i \in \Omega_2, \\
+      0, & \text{for } i \notin \Omega_2,
+    \end{cases}
+\end{align}
+with \( p_w(t) \), \( p_g(t) \), and \( p_c(t) \) denoting the percentage of white matter, grey matter, and CSF at time \( t \), and \(\kappa_w\), \(\kappa_g\), \(\kappa_c\) representing the relaxation rates for the corresponding tissues. It is assumed that \(\kappa_c > \kappa_w > \kappa_g\). The pressure \( p \) is calculated by solving the following Helmholtz-like equation derived from equations \eqref{eq:darcy} and \eqref{eq:continuity}:
+\begin{align}
+    -\nabla \cdot (\calM \nabla p) &= \rho u(1 - u) - \kappa p \quad \text{in } \Omega_2, \label{eq:helmholtz} \\
+    \nabla p \cdot \bn &= 0 \quad \text{on } \partial \Omega_2. \label{eq:helmholtz-boundary}
+\end{align}
+
+The solution to equations \eqref{eq:helmholtz} and \eqref{eq:helmholtz-boundary} gives the pressure field, which is then used to compute the deformation rate \(\bv\) using equation \eqref{eq:darcy}.
+
+\subsection{Tissue Dynamics}
+
+The growing tumor compresses and displaces the surrounding brain tissue. Let \( \omega_w(\bx,t) \), \( \omega_g(\bx,t) \), and \( \omega_c(\bx,t) \) denote the cell density of white matter, grey matter, and CSF, respectively, at time \( t \) and location \( \bx \). The dynamics of each tissue constituent \( \omega_s\), \( s \in \{w, g, c\} \), is modeled by the following advection-convection equation:
+
+\begin{align}
+    \frac{\partial \omega_s}{\partial t} &= -\bv \cdot \nabla \omega_s - \omega_s \nabla \cdot \bv \quad \text{in } \Omega_2, \label{eq:tissue-dynamics} \\
+    \nabla \omega_s \cdot \bn &= 0 \quad \text{on } \partial \Omega_2, \label{eq:tissue-boundary} \\
+    \omega_s(t=0) &= \omega_s^0 \quad \text{in } \Omega_2. \label{eq:tissue-initial-condition}
+\end{align}
+
+The cell density of each tissue component in equation \eqref{eq:tissue-initial-condition} is initialized from the tissue segmentation, which can be computed with the provided open-source software. The advection term describes tissue displacement, while the convection term models tissue compression. After each simulation time step, the percentage of each tissue component must be recomputed accordingly:
+\begin{align}
+    p_s(\bx, t) = \frac{\omega_s(\bx, t)}{\omega_w(\bx, t) + \omega_g(\bx, t) + \omega_c(\bx, t)} , \quad \forall \bx \in \Omega_2, \, s \in \{w, g, c\}.
+\end{align}
+
+This ensures that the tissue percentage at each voxel is compatible with the tissue density maps, and that \( p_w(\bx, t) + p_g(\bx, t) + p_c(\bx, t) = 1 \) for all \( \bx \in \Omega_2 \).
+
+Let us note that in equation \eqref{eq:tumor-dynamics}, the tumor is only subject to displacement, not compression. The reason for this assumption is that gliomas, in contrast to other solid tumors, infiltrate the surrounding tissue, and thus the pressure acting from the tissue on the tumor is minimal. However, if tumor compression is of interest, this can be achieved by including the convection term (i.e., \(- u \nabla \cdot \bv\)) on the right-hand side of equation \eqref{eq:tumor-dynamics}.
+
+
+% \bibliographystyle{agsm}
+
+% \bibliography{bib-tumor.bib}
+\end{document}
