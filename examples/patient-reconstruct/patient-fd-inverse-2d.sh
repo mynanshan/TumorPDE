@@ -1,13 +1,13 @@
 #!/bin/bash
-#SBATCH --job-name=fd_parallel     # Job name
+#SBATCH --job-name=fd_parallel_2d     # Job name
 #SBATCH --account=def-jiguocao
 #SBATCH --ntasks=1
 #SBATCH --gpus-per-node=1
-#SBATCH --cpus-per-task=16
+#SBATCH --cpus-per-task=8
 #SBATCH --mem-per-cpu=8GB
-#SBATCH --time=8:00:00
+#SBATCH --time=3:00:00
 #SBATCH --array=0-4                # Job array, one job for each patient
-#SBATCH --output="output_files/patient-fd-%A_%a.out"
+#SBATCH --output="output_files/patient-fd-2d-%A_%a.out"
 
 # Usage: patient-fd-inverse.sh <tumor slice id>
 
@@ -18,6 +18,6 @@ patients=("HR" "LY" "STT" "XXH" "YXB")
 patient=${patients[$SLURM_ARRAY_TASK_ID]}
 
 # Run the Python script with the selected patient
-python3 patient-fd-inverse.py -p=$patient -t=$1 -s=$2 -m=$3
+python3 patient-fd-inverse-2d.py -p=$patient -t=$1 -s=$2 -m=$3
 
 echo "Finished!"

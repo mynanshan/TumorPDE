@@ -1,12 +1,12 @@
 #!/project/6006512/muye/env/torch/bin/python
-#SBATCH --job-name=fd
+#SBATCH --job-name=fd-2d
 #SBATCH --account=def-jiguocao
 #SBATCH --nodes=1
 #SBATCH --gpus-per-node=1
-#SBATCH --cpus-per-task=16
+#SBATCH --cpus-per-task=8
 #SBATCH --mem-per-cpu=8G
-#SBATCH --time=12:00:00
-#SBATCH --output="output_files/patient-fd-%j.out"
+#SBATCH --time=3:00:00
+#SBATCH --output="output_files/patient-fd-2d-%j.out"
 
 
 # import psutil
@@ -71,8 +71,8 @@ print(f"The current device is: {device}")
 import json
 from datetime import datetime
 
-from scan_utils import visualize_model_fit, visualize_model_fit_multiscan, weighted_center
-from expriment_helpers import read_patient_data, append_parameters_to_file
+from scan_utils import visualize_model_fit_2d, visualize_model_fit_multiscan_2d, weighted_center
+from expriment_helpers import read_patient_data_2d, append_parameters_to_file
 
 ## ============================================================
 ##                         Load data
@@ -92,7 +92,7 @@ args = parser.parse_args()
 patient = args.patient
 print(f"Modelling Patient: {patient}")
 
-data = read_patient_data(patient, test=args.test)
+data = read_patient_data_2d(patient, test=args.test)
 
 dir_path = data["dir_path"]
 # brain = data["brain"]
@@ -105,7 +105,7 @@ tumor2 = data["tumor2"]
 visualize_pos = data["visualize_pos"]
 del data
 
-paramfile_path = os.path.join(dir_path, "parameters.txt")
+paramfile_path = os.path.join(dir_path, "parameters2d.txt")
 
 print(f"Tumor array shape: {tumor1.shape}")
 print(f"Brain array shape: {brain_raw.shape}")
@@ -124,7 +124,7 @@ del gm, wm, csf
 # Define the spatial domain 
 # assume the voxel has equal width along each axis pixel
 # this is only valid when the image has been properly re-scaled
-geom = VolumeDomain(vox, [1.,1.,1.])
+geom = VolumeDomain(vox, [1.,1.])
 
 # Define the time domain
 t0, t1 = 0., 1.
@@ -181,15 +181,15 @@ if args.single_scan == 1:
 
     print("Start plotting")
 
-    plot_dir = os.path.join(dir_path, "plots", patient)
+    plot_dir = os.path.join(dir_path, "plots2d", patient)
     os.makedirs(plot_dir, exist_ok=True)
 
     u, _, _ = fd_pde.solve(
         dt=0.001, t1=2 * t1, D=result['D'], rho=result['rho'], x0=result['x0'],
-        plot_func=visualize_model_fit, plot_period=50,
+        plot_func=visualize_model_fit_2d, plot_period=50,
         plot_args = {'save_dir': plot_dir, 'file_prefix': patient,
                     "brain": brain_raw, "tumor1": tumor1, "tumor2": tumor2,
-                    "slice_fracs": visualize_pos, "show": False, "main_title": patient},
+                    "show": False, "main_title": patient},
         save_all=False)
 
     append_parameters_to_file(
@@ -240,17 +240,16 @@ if args.multi_scan == 1:
 
     print("Start plotting")
 
-    plot_dir = os.path.join(dir_path, "plots_multiscan", patient)
+    plot_dir = os.path.join(dir_path, "plots2d_multiscan", patient)
     os.makedirs(plot_dir, exist_ok=True)
 
     u, _, _ = fd_pde.solve(
         dt=0.001, t1=1.5*t1, D=result['D'], rho=result['rho'], x0=result['x0'],
-        plot_func=visualize_model_fit_multiscan, plot_period=50,
+        plot_func=visualize_model_fit_multiscan_2d, plot_period=50,
         plot_args = {'save_dir': plot_dir, 'file_prefix': patient,
                     "brain": brain_raw, "tumor1": tumor1, "tumor2": tumor2,
                     "t_scan": result['t_scan'], "real_t_diff": date_difference,
-                    "time_unit": "day",
-                    "slice_fracs": visualize_pos, "show": False,
+                    "time_unit": "day", "show": False,
                     "main_title": patient},
         save_all=False)
 
@@ -258,6 +257,3 @@ if args.multi_scan == 1:
         paramfile_path, patient, "multi scan",
         result['D'].item(), result['rho'].item(), result['x0'].tolist(),
         result['t_scan'][0])
-
-
-
