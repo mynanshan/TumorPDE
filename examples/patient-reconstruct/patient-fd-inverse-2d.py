@@ -102,7 +102,6 @@ wm = data["wm"]
 csf = data["csf"]
 tumor1 = data["tumor1"]
 tumor2 = data["tumor2"]
-visualize_pos = data["visualize_pos"]
 del data
 
 paramfile_path = os.path.join(dir_path, "parameters2d.txt")
