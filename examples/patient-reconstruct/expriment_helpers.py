@@ -197,7 +197,6 @@ def read_patient_data_2d(patient: str, test: bool = False):
     }
 
 
-
 def append_parameters_to_file(file_path, patient, experiment_type, D, rho, x0, t1=None):
     current_datetime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     new_row = [current_datetime, patient,
@@ -214,6 +213,32 @@ def append_parameters_to_file(file_path, patient, experiment_type, D, rho, x0, t
         # If file doesn't exist, create it with a header
         existing_rows = [["Datetime", "Patient", "Experiment Type",
                           "D", "rho", "x0[0]", "x0[1]", "x0[2]"], "t1"]
+
+    # Insert new row at the beginning (after header)
+    existing_rows.insert(1, new_row)
+
+    # Write updated content back to file
+    with open(file_path, 'w', newline='') as f:
+        writer = csv.writer(f, delimiter='\t')
+        writer.writerows(existing_rows)
+
+
+def append_parameters_to_file_2d(file_path, patient, experiment_type, D, rho, x0, t1=None):
+    current_datetime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    new_row = [current_datetime, patient,
+               experiment_type, D, rho, x0[0], x0[1], x0[2],
+               t1 if t1 is not None else ""]
+
+    # Read existing content
+    existing_rows = []
+    try:
+        with open(file_path, 'r', newline='') as f:
+            reader = csv.reader(f, delimiter='\t')
+            existing_rows = list(reader)
+    except FileNotFoundError:
+        # If file doesn't exist, create it with a header
+        existing_rows = [["Datetime", "Patient", "Experiment Type",
+                          "D", "rho", "x0[0]", "x0[1]"], "t1"]
 
     # Insert new row at the beginning (after header)
     existing_rows.insert(1, new_row)

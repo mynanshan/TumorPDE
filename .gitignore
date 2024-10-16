@@ -1,8 +1,5 @@
 examples/data/
-examples/patient-reconstruct/plots/
-examples/patient-reconstruct/plots_multiscan/
 examples/patient-reconstruct/plots*/
-examples/patient-reconstruct/gifs/
-examples/patient-reconstruct/gifs_multiscan/
 examples/patient-reconstruct/gifs*/
 examples/patient-reconstruct/output_files/
+pyrightconfig.json

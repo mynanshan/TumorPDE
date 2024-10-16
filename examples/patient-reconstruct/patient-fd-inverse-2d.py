@@ -72,7 +72,7 @@ import json
 from datetime import datetime
 
 from scan_utils import visualize_model_fit_2d, visualize_model_fit_multiscan_2d, weighted_center
-from expriment_helpers import read_patient_data_2d, append_parameters_to_file
+from expriment_helpers import read_patient_data_2d, append_parameters_to_file_2d
 
 ## ============================================================
 ##                         Load data
@@ -120,7 +120,7 @@ print(f"Min check > gm: {gm.min()}, wm: {wm.min()}, csf: {csf.min()}")
 vox = (0.1 * gm + 0.9 * wm + 0.02 * csf).copy()
 del gm, wm, csf
 
-# Define the spatial domain 
+# Define the spatial domain
 # assume the voxel has equal width along each axis pixel
 # this is only valid when the image has been properly re-scaled
 geom = VolumeDomain(vox, [1.,1.])
@@ -235,7 +235,7 @@ if args.multi_scan == 1:
         print(f"Scan dates for patient {patient}: {patient_scan_dates}")
         print(f"Difference between the two scan dates: {date_difference} days")
     else:
-        print(f"No scan dates found for patient {patient}")
+        raise ValueError(f"No scan dates found for patient {patient}")
 
     print("Start plotting")
 
@@ -252,7 +252,7 @@ if args.multi_scan == 1:
                     "main_title": patient},
         save_all=False)
 
-    append_parameters_to_file(
+    append_parameters_to_file_2d(
         paramfile_path, patient, "multi scan",
         result['D'].item(), result['rho'].item(), result['x0'].tolist(),
         result['t_scan'][0])

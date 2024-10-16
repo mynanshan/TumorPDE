@@ -236,7 +236,7 @@ if args.multi_scan == 1:
         print(f"Scan dates for patient {patient}: {patient_scan_dates}")
         print(f"Difference between the two scan dates: {date_difference} days")
     else:
-        print(f"No scan dates found for patient {patient}")
+        raise ValueError(f"No scan dates found for patient {patient}")
 
     print("Start plotting")
 
