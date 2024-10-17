@@ -191,7 +191,7 @@ if args.single_scan == 1:
                     "show": False, "main_title": patient},
         save_all=False)
 
-    append_parameters_to_file(
+    append_parameters_to_file_2d(
         paramfile_path, patient, "single scan",
         result['D'].item(), result['rho'].item(), result['x0'].tolist())
 
