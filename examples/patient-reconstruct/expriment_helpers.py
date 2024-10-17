@@ -226,7 +226,7 @@ def append_parameters_to_file(file_path, patient, experiment_type, D, rho, x0, t
 def append_parameters_to_file_2d(file_path, patient, experiment_type, D, rho, x0, t1=None):
     current_datetime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     new_row = [current_datetime, patient,
-               experiment_type, D, rho, x0[0], x0[1], x0[2],
+               experiment_type, D, rho, x0[0], x0[1],
                t1 if t1 is not None else ""]
 
     # Read existing content
