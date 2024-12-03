@@ -1,10 +1,17 @@
 import os
 from scan_utils import ndarray_from_nifty
+import numpy as np
 from scipy.ndimage import zoom
 
 import datetime
 import csv
 
+def resize_to_match(target, source):
+    """
+    Resizes the `source` array to match the shape of the `target` array.
+    """
+    zoom_factors = np.array(target.shape) / np.array(source.shape)
+    return zoom(source, zoom_factors, order=1)
 
 def read_patient_data(patient: str, test: bool = False):
 
@@ -69,6 +76,10 @@ def read_patient_data(patient: str, test: bool = False):
             dir_path, patient, f'test_{patient}1_tumor_resized.nii.gz'))
         tumor2, _, _ = ndarray_from_nifty(os.path.join(
             dir_path, patient, f'test_{patient}2_tumor_resized.nii.gz'))
+
+    # Ensure tumor2 matches tumor1 shape
+    if tumor1.shape != tumor2.shape:
+        tumor2 = resize_to_match(tumor1, tumor2)
 
     # If image is too large
     if zoom_factors < 1.:
