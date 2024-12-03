@@ -12,7 +12,7 @@
 # Usage: patient-fd-inverse.sh <tumor slice id>
 
 # Array of patient IDs
-patients=("HR" "LY" "STT" "XXH" "YXB")
+patients=("HR" "LY" "STT" "XXH" "YXB" "WXS")
 
 # Select the patient based on the array index
 patient=${patients[$SLURM_ARRAY_TASK_ID]}

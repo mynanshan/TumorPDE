@@ -40,7 +40,7 @@ def read_patient_data(patient: str, test: bool = False):
         visualize_pos = [[0.25, 0.3, 0.35], [
             0.50, 0.55, 0.60], [0.34, 0.38, 0.42]]
 
-    elif patient == "MXS":
+    elif patient == "WXS":
         zoom_factors = 1.
         visualize_pos = [[0.3, 0.35, 0.4], [
             0.35, 0.4, 0.45], [0.55, 0.6, 0.65]]
