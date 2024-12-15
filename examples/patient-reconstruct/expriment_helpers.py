@@ -84,6 +84,7 @@ def read_patient_data(patient: str, test: bool = False):
 
     # Ensure tumor2 matches tumor1 shape
     if tumor1.shape != tumor2.shape:
+        print("Scan 1 and Scan 2 have different shapes. Resizing tumor 2.")
         tumor2 = resize_to_match(tumor1, tumor2)
 
     # If image is too large
@@ -228,7 +229,7 @@ def append_parameters_to_file(file_path, patient, experiment_type, D, rho, x0, t
     except FileNotFoundError:
         # If file doesn't exist, create it with a header
         existing_rows = [["Datetime", "Patient", "Experiment Type",
-                          "D", "rho", "x0[0]", "x0[1]", "x0[2]"], "t1"]
+                          "D", "rho", "x0[0]", "x0[1]", "x0[2]", "t1"]]
 
     # Insert new row at the beginning (after header)
     existing_rows.insert(1, new_row)

@@ -1,3 +1,13 @@
+#!/project/6006512/muye/env/torch/bin/python
+#SBATCH --job-name=gif-maker     # Job name
+#SBATCH --account=def-jiguocao
+#SBATCH --ntasks=1
+#SBATCH --gpus-per-node=1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem-per-cpu=2GB
+#SBATCH --time=1:00:00
+#SBATCH --output="gif-maker-%A_%a.out"
+
 from PIL import Image
 import os
 import re
@@ -14,7 +24,7 @@ args = parser.parse_args()
 image_folder = args.image_folder
 output_folder = args.output_folder
 
-patient_list = ['HR', 'LY', 'STT', 'XXH', 'YXB']
+patient_list = ['HR', 'LY', 'STT', 'XXH', 'YXB', 'WXS']
 
 def extract_info(filename):
     match = re.match(r'(.*)-i(\d+)\.jpg', filename)
