@@ -37,8 +37,15 @@ patient_t1 = ants.image_read(os.path.join(
     dir_path, f'{patient}{scan_id}_brain.nii'),
     reorient=True)
 
-tumor_mask = ants.image_read(os.path.join(
-    dir_path, f'{patient}{scan_id}_tumor.nii'))
+if patient == "YXB" and scan_id == "2":
+    tumor_mask = ants.image_read(os.path.join(
+        dir_path, f'{patient}{scan_id}_tumor_corrected.nii.gz'))
+else:
+    tumor_mask = ants.image_read(os.path.join(
+        dir_path, f'{patient}{scan_id}_tumor.nii'))
+# if scan_id != "1":
+#     tumor_ref = ants.image_read(os.path.join(
+#         dir_path, f'{patient}1_tumor.nii'))
 
 # Get the voxel sizes and resample parameters
 voxel_sizes = patient_t1.spacing
@@ -48,6 +55,9 @@ resample_params = (min_spacing, min_spacing, min_spacing)
 # Resample patient image and tumor mask
 patient_t1 = patient_t1.resample_image(
     resample_params, use_voxels=False, interp_type=0)
+# if scan_id != "1":
+#     tumor_mask = tumor_mask.resample_image_to_target(tumor_ref, interp_type='nearestNeighbor')
+#     del tumor_ref
 tumor_mask = tumor_mask.resample_image_to_target(patient_t1, interp_type='nearestNeighbor')
 
 # Resample atlas images to match patient image
