@@ -45,6 +45,11 @@ def read_patient_data(patient: str, test: bool = False):
         visualize_pos = [[0.3, 0.35, 0.4], [
             0.35, 0.4, 0.45], [0.55, 0.6, 0.65]]
 
+    elif patient == "WZL":
+        zoom_factors = 0.5
+        visualize_pos = [[0.6, 0.65, 0.7], [
+            0.65, 0.7, 0.75], [0.45, 0.5, 0.55]]
+
     else:
         raise ValueError("No visualize_pos available.")
 
@@ -70,7 +75,7 @@ def read_patient_data(patient: str, test: bool = False):
         brain, aff_info, header = ndarray_from_nifty(os.path.join(
             dir_path, patient, f'test_{patient}1_brain_normalized.nii.gz'))
         brain_raw, _, _ = ndarray_from_nifty(os.path.join(
-            dir_path, patient, f'test_{patient}1_brain_resized.nii.gz'))
+            dir_path, patient, f'test_{patient}2_brain_resized.nii.gz'))
         gm, _, _ = ndarray_from_nifty(os.path.join(
             dir_path, patient, f'test_{patient}1_gm_normalized.nii.gz'))
         wm, _, _ = ndarray_from_nifty(os.path.join(

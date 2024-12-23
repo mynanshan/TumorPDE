@@ -6,13 +6,13 @@
 #SBATCH --cpus-per-task=16
 #SBATCH --mem-per-cpu=8GB
 #SBATCH --time=8:00:00
-#SBATCH --array=0-4                # Job array, one job for each patient
+#SBATCH --array=0-6                # Job array, one job for each patient
 #SBATCH --output="output_files/patient-fd-%A_%a.out"
 
 # Usage: patient-fd-inverse.sh <tumor slice id>
 
 # Array of patient IDs
-patients=("HR" "LY" "STT" "XXH" "YXB" "WXS")
+patients=("HR" "LY" "STT" "XXH" "YXB" "WXS" "WZL")
 
 # Select the patient based on the array index
 patient=${patients[$SLURM_ARRAY_TASK_ID]}
