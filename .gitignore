@@ -2,4 +2,6 @@ examples/data/
 examples/patient-reconstruct/plots*/
 examples/patient-reconstruct/gifs*/
 examples/patient-reconstruct/output_files/
-pyrightconfig.json
+**/__pycache__/
+**/*egg-info/
+**/deprecated/
