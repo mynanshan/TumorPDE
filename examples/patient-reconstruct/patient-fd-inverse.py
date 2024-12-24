@@ -87,12 +87,14 @@ parser.add_argument('-s', '--single_scan', type=int, choices=[0, 1], default=1,
                     required=False, help='Whether to run the single-scan calibration')
 parser.add_argument('-m', '--multi_scan', type=int, choices=[0, 1], default=1,
                     required=False, help='Whether to run the multi-scan calibration')
+parser.add_argument('-r', '--ref_scan', type=int, default=1,
+                    required=False, help='Which scan is used as the ref_scan')
 args = parser.parse_args()
 
 patient = args.patient
 print(f"Modelling Patient: {patient}")
 
-data = read_patient_data(patient, test=args.test)
+data = read_patient_data(patient, test=args.test, ref=args.ref_scan)
 
 dir_path = data["dir_path"]
 # brain = data["brain"]

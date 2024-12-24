@@ -31,25 +31,25 @@ del atlas_mask
 # Get patient ID from the command line
 patient = sys.argv[1]
 num_scan = int(sys.argv[2])
+ref_scan_id = int(sys.argv[3]) if len(sys.argv) > 3 else 1
 
-for i in range(num_scan):
+for i in range(num_scan + 1):
 
-    scan_id = i + 1
+    # process the ref scan in the 1st iteration
+    scan_id = i if i != 0 else ref_scan_id
+    if i == ref_scan_id:
+        next
     print(f"Registering Patient: {patient} Scan ID: {scan_id}")
     dir_path = f"../data/PatienTumorMultiScan2024/{patient}/"
     patient_t1 = ants.image_read(os.path.join(
         dir_path, f'{patient}{scan_id}_brain.nii'),
         reorient=True)
-
-    if patient == "YXB" and scan_id == 1:
-        tumor_mask = ants.image_read(os.path.join(
-            dir_path, f'{patient}{scan_id}_tumor_corrected.nii.gz'))
-    else:
-        tumor_mask = ants.image_read(os.path.join(
-            dir_path, f'{patient}{scan_id}_tumor.nii'))
+    tumor_mask = ants.image_read(os.path.join(
+        dir_path, f'{patient}{scan_id}_tumor.nii'))
 
     # Resample patient image and tumor mask
-    if scan_id == 1:
+    if scan_id == ref_scan_id:
+        # if processing the ref scan
         # Get the voxel sizes and resample parameters
         voxel_sizes = patient_t1.spacing
         min_spacing = min(voxel_sizes)
@@ -59,6 +59,7 @@ for i in range(num_scan):
             resample_params, use_voxels=False, interp_type=0)
         ref_image = patient_t1
     else:
+        # if processing the rest of the scans
         patient_t1 = patient_t1.resample_image_to_target(
             ref_image, interp_type='linear')
 
@@ -99,11 +100,6 @@ for i in range(num_scan):
         fixed=patient_t1, moving=atlas_wm, transformlist=reg['fwdtransforms'])
     warped_csf = ants.apply_transforms(
         fixed=patient_t1, moving=atlas_csf, transformlist=reg['fwdtransforms'])
-    # warped_tumor = ants.apply_transforms(
-    #     fixed=patient_t1, moving=tumor_mask, transformlist=reg['fwdtransforms'],
-    #     interpolator='nearestNeighbor')
-    # warped_raw = ants.apply_transforms(
-    #     fixed=warped_atlas, moving=patient_t1, transformlist=reg['invtransforms'])
 
     # Save the transformed images
     warped_atlas.to_file(os.path.join(
@@ -111,10 +107,6 @@ for i in range(num_scan):
     warped_gm.to_file(os.path.join(dir_path, f'{patient}{scan_id}_gm_normalized.nii.gz'))
     warped_wm.to_file(os.path.join(dir_path, f'{patient}{scan_id}_wm_normalized.nii.gz'))
     warped_csf.to_file(os.path.join(dir_path, f'{patient}{scan_id}_csf_normalized.nii.gz'))
-    # warped_tumor.to_file(os.path.join(
-    #     dir_path, f'{patient}{scan_id}_tumor_normalized.nii.gz'))
-    # warped_raw.to_file(os.path.join(
-    #     dir_path, f'{patient}{scan_id}_brain_raw_inv.nii.gz'))
 
     # Save the transformation filenames
     np.savetxt(os.path.join(

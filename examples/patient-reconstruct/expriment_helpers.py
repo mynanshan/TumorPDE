@@ -13,7 +13,7 @@ def resize_to_match(target, source):
     zoom_factors = np.array(target.shape) / np.array(source.shape)
     return zoom(source, zoom_factors, order=1)
 
-def read_patient_data(patient: str, test: bool = False):
+def read_patient_data(patient: str, test: bool = False, ref: int = 1):
 
     if patient == "STT":
         zoom_factors = 0.7
@@ -57,15 +57,15 @@ def read_patient_data(patient: str, test: bool = False):
     if test == 0:
         dir_path = "../data/PatienTumorMultiScan2024/"
         brain, aff_info, header = ndarray_from_nifty(os.path.join(
-            dir_path, patient, f'{patient}1_brain_normalized.nii.gz'))
+            dir_path, patient, f'{patient}{ref}_brain_normalized.nii.gz'))
         brain_raw, _, _ = ndarray_from_nifty(os.path.join(
-            dir_path, patient, f'{patient}1_brain_resized.nii.gz'))
+            dir_path, patient, f'{patient}{ref}_brain_resized.nii.gz'))
         gm, _, _ = ndarray_from_nifty(os.path.join(
-            dir_path, patient, f'{patient}1_gm_normalized.nii.gz'))
+            dir_path, patient, f'{patient}{ref}_gm_normalized.nii.gz'))
         wm, _, _ = ndarray_from_nifty(os.path.join(
-            dir_path, patient, f'{patient}1_wm_normalized.nii.gz'))
+            dir_path, patient, f'{patient}{ref}_wm_normalized.nii.gz'))
         csf, _, _ = ndarray_from_nifty(os.path.join(
-            dir_path, patient, f'{patient}1_csf_normalized.nii.gz'))
+            dir_path, patient, f'{patient}{ref}_csf_normalized.nii.gz'))
         tumor1, _, _ = ndarray_from_nifty(os.path.join(
             dir_path, patient, f'{patient}1_tumor_resized.nii.gz'))
         tumor2, _, _ = ndarray_from_nifty(os.path.join(
