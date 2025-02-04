@@ -1,0 +1,13 @@
+../data/PatienTumorMultiScan2024/HR,HR,2
+../data/PatienTumorMultiScan2024/LT,LT,3
+../data/PatienTumorMultiScan2024/LY,LY,2
+../data/PatienTumorMultiScan2024/NH,NH,3
+../data/PatienTumorMultiScan2024/STT,STT,2
+../data/PatienTumorMultiScan2024/WHB,WHB,3
+../data/PatienTumorMultiScan2024/WWD,WWD,3
+../data/PatienTumorMultiScan2024/WXS,WXS,2
+../data/PatienTumorMultiScan2024/WZL,WZL,2
+../data/PatienTumorMultiScan2024/XXH,XXH,2
+../data/PatienTumorMultiScan2024/YXB,YXB,3
+../data/PatienTumorMultiScan2024/ZQ,ZQ,3
+../data/PatienTumorMultiScan2024/ZRJ,ZRJ,3

@@ -6,7 +6,7 @@
 #SBATCH --mem-per-cpu=4G                     # Memory per task (adjust as needed)
 #SBATCH --time=01:00:00              # Time limit
 
-export PATH=$PATH:~/projects/def-jiguocao/muye/softwares/ants-2.5.4/bin/
+source settings.sh
 
 # Ensure script is called with the correct number of arguments
 if [ "$#" -ne 2 ]; then
@@ -20,22 +20,20 @@ scan_id="$2"
 
 echo "Start skull stripping. Patient $patient_id. Scan $scan_id."
 
-# Define paths and file prefixes
-data="../data/PatienTumorMultiScan2024/$patient_id"
-atlas="../data/Atlas"
+# Define file prefixes
+data="${DATA_DIR}/${patient_id}"
 prefix="${patient_id}${scan_id}"
-input_file="${data}/${prefix}_brain_unstripped.nii"
+input_file="${data}/${prefix}_t1_unstripped.nii"
 
 # Run antsBrainExtraction.sh
 antsBrainExtraction.sh -d 3 \
     -a "$input_file" \
-    -e "${atlas}/atlas_t1.nii" \
-    -m "${atlas}/atlas_mask.nii" \
+    -e "${ATLAS_PATH}/atlas_t1.nii" \
+    -m "${ATLAS_PATH}/atlas_mask.nii" \
     -o "${data}/${prefix}_"
 
 # Decompress and rename the mask file
 gunzip "${data}/${prefix}_BrainExtractionBrain.nii.gz"
-mv "${data}/${prefix}_BrainExtractionBrain.nii" "${data}/${prefix}_brain.nii"
+mv "${data}/${prefix}_BrainExtractionBrain.nii" "${data}/${prefix}_t1.nii"
 
-echo "Skull stripping complete. Output written to ${data}/${prefix}_brain.nii."
-
+echo "Skull stripping complete. Output written to ${data}/${prefix}_t1.nii."

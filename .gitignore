@@ -1,7 +1,9 @@
-examples/data/
-examples/patient-reconstruct/plots*/
-examples/patient-reconstruct/gifs*/
-examples/patient-reconstruct/output_files/
+**/data/
+**/results/
+**/plots*/
+**/gifs*/
+**/output_files/
+**/logs/
 **/__pycache__/
 **/*egg-info/
 **/deprecated/

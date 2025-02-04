@@ -38,14 +38,14 @@ for i in range(num_scan + 1):
     # process the ref scan in the 1st iteration
     scan_id = i if i != 0 else ref_scan_id
     if i == ref_scan_id:
-        next
+        continue
     print(f"Registering Patient: {patient} Scan ID: {scan_id}")
     dir_path = f"../data/PatienTumorMultiScan2024/{patient}/"
     patient_t1 = ants.image_read(os.path.join(
-        dir_path, f'{patient}{scan_id}_brain.nii'),
+        dir_path, f'{patient}{scan_id}_t1.nii'),
         reorient=True)
     tumor_mask = ants.image_read(os.path.join(
-        dir_path, f'{patient}{scan_id}_tumor.nii'))
+        dir_path, f'{patient}{scan_id}_t1mask.nii'))
 
     # Resample patient image and tumor mask
     if scan_id == ref_scan_id:
@@ -118,3 +118,6 @@ for i in range(num_scan + 1):
     patient_t1.plot(overlay=warped_atlas, overlay_alpha=0.6, overlay_cmap="Blues",
                     title='After Registration', axis=2, nslices=16,
                     filename=os.path.join(dir_path, f'{patient}{scan_id}_brain_registered.jpg'))
+    warped_atlas.plot(overlay=tumor_mask, overlay_alpha=0.6, overlay_cmap="Reds",
+                        title='Registered Brain & Tumor', axis=2, nslices=16,
+                        filename=os.path.join(dir_path, f'{patient}{scan_id}_brain_registered_tumor.jpg'))
