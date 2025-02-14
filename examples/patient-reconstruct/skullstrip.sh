@@ -1,5 +1,6 @@
 #!/bin/bash
-#SBATCH --job-name=skull_stripping     # Job name
+#SBATCH --job-name=skullstrip     # Job name
+#SBATCH --output=logs/skullstrip_%A_%a.out
 #SBATCH --account=def-jiguocao
 #SBATCH --ntasks=1                   # Number of tasks (1 per patient)
 #SBATCH --cpus-per-task=16            # Number of CPU cores per task (adjust as needed)

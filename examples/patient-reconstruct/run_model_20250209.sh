@@ -1,0 +1,11 @@
+# Fit glioma infiltration model for patients:
+# DANG_ZHOU_CAI_RANG
+# LU_JIN_XIN
+# QIN_HAN
+# SONG_CHAO_MEI
+# WANG_FU
+# WANG_QIONG
+# WANG_ZHONG_LIANG
+# XIN_YAN
+# XU_GUI_YING
+# XU_XIAO

@@ -73,8 +73,8 @@ for i in range(num_scan + 1):
         patient_t1, interp_type='linear')
 
 
-    patient_t1.to_file(os.path.join(dir_path, f'{patient}{scan_id}_brain_resized.nii.gz'))
-    tumor_mask.to_file(os.path.join(dir_path, f'{patient}{scan_id}_tumor_resized.nii.gz'))
+    patient_t1.to_file(os.path.join(dir_path, f'{patient}{scan_id}_t1_resized.nii.gz'))
+    tumor_mask.to_file(os.path.join(dir_path, f'{patient}{scan_id}_t1mask_resized.nii.gz'))
 
     patient_t1.plot(overlay=tumor_mask, overlay_alpha=0.3, overlay_cmap="Reds",
                     title='Scan & Tumor Mask', axis=2, nslices=16,
