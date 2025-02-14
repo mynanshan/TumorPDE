@@ -13,33 +13,50 @@ from tumorpde.models._base import TumorFixedFieldBase
 from tumorpde.models.comp_utils import _get_slicing_positions, _nabla_d_nabla_f
 from tumorpde.models.specs import _spec_dt
 
+# TODO:
+# - allow a user-specified initial density func with learnable params defined inside
+# - remove built-in support for learning x0
+# - user needs to provide a list of external learnable parameters
 
 class TumorInfiltraFD(TumorFixedFieldBase):
 
-    def __init__(self, domain: VolumeDomain, x0: TensorLikeFloat = None,
+    def __init__(self, domain: VolumeDomain,
                  D: TensorLikeFloat = 1., rho: TensorLikeFloat = 1.,
                  init_density_func: Optional[Callable] = None,
-                 init_density_deriv: Optional[Callable] = None,
                  init_density_params: Optional[Dict] = None,
+                 init_learnable_params: Optional[List[str]] = None,
+                 init_density_deriv: Optional[Callable] = None,
                  dtype: torch.dtype = torch.float32,
                  device: torch.device = torch.device('cpu')):
         """ 
         Args:
-            domain: VolumeDomain, the domain of the tumor growth model.
-            x0: TensorLikeFloat, the initial position of the tumor.
-            D: TensorLikeFloat, the diffusion coefficient.
-            rho: TensorLikeFloat, the growth rate.
-            init_density_func: callable, the initial density function.
-            init_density_deriv: callable, the derivative of the initial density function.
-            init_density_params: dict, the parameters of the initial density function.
+
+        domain:
+            VolumeDomain, the domain of the tumor growth model.
+        init_density_func:
+            callable, the initial density function, (*voxel_shape) -> (*voxel_shape)
+        init_density_params:
+            dict, the parameters of the initial density function.
+        init_learnable_params:
+            list[str], names of the learnable parameters in init_density_params
+        init_density_deriv:
+            callable, the derivative of the initial density function, (*voxel_shape) -> (len(init_params), *voxel_shape).
+        autograd:
+            bool, whether to use autograd.
+        dtype:
+            torch.dtype, the data type of the parameters.
+        device:
+            torch.device, the device of the parameters.
         """
 
         super().__init__(domain,
-                         init_density_func, init_density_deriv, init_density_params,
+                         init_density_func, init_density_params,
+                         init_learnable_params, init_density_deriv,
                          False, dtype, device)
 
         # Parameters
-        self.nparam = 2 + self.dim
+        self.nparam_main = 2
+        self.nparam = self.nparam_main + self.nparam_init
         self.model_param_specs = {
             'D': {
                 'id': 0,
@@ -56,34 +73,28 @@ class TumorInfiltraFD(TumorFixedFieldBase):
                 'log_avail': True,
                 'scaling': 'current',
                 'centering': 'current'
-            },
-            'x0': {
-                'id': list(range(2, 2+self.dim)),
-                'min': self.xmin.to(**self.factory_args),
-                'max': self.xmax.to(**self.factory_args),
-                'log_avail': False,
-                'scaling': (0.5 * (self.xmax - self.xmin).to(
-                    **self.factory_args)),
-                'centering': (0.5 * (self.xmax - self.xmin).to(
-                    **self.factory_args))
             }
         }
+        # ,
+        # 'x0': {
+        #     'id': list(range(2, 2+self.dim)),
+        #     'min': self.xmin.to(**self.factory_args),
+        #     'max': self.xmax.to(**self.factory_args),
+        #     'log_avail': False,
+        #     'scaling': (0.5 * (self.xmax - self.xmin).to(
+        #         **self.factory_args)),
+        #     'centering': (0.5 * (self.xmax - self.xmin).to(
+        #         **self.factory_args))
+        # }
 
-        x0 = torch.as_tensor(self.domain.bbox_widths / 2, **self.factory_args) \
-            if x0 is None else torch.as_tensor(x0, **self.factory_args)
+        # x0 = torch.as_tensor(self.domain.bbox_widths / 2, **self.factory_args) \
+        #     if x0 is None else torch.as_tensor(x0, **self.factory_args)
         D = torch.as_tensor(D, **self.factory_args)
         rho = torch.as_tensor(rho, **self.factory_args)
         self.parameters = torch.cat(
+            [D.view(-1), rho.view(-1)], dim=0)
+        self.parameters = torch.cat(
             [D.view(-1), rho.view(-1), x0.view(-1)], dim=0)
-
-        # self.x0 = torch.as_tensor(self.domain.bbox_widths / 2, **self.factory_args) \
-        #     if x0 is None else torch.as_tensor(x0, **self.factory_args)
-        # self.D = torch.as_tensor(D, **self.factory_args)
-        # self.rho = torch.as_tensor(rho, **self.factory_args)
-        # # save the previous parameters for convenience
-        # self._x0_old = None
-        # self._D_old = None
-        # self._rho_old = None
 
         # Settings for the training process
         # parameters with proper resizing are called working parameters
@@ -110,73 +121,12 @@ class TumorInfiltraFD(TumorFixedFieldBase):
     def _rho(self, params):
         return params[self.model_param_specs['rho']['id']]
 
-    @property
-    def x0(self):
-        return self._x0(self.parameters)
-
-    def _x0(self, params):
-        return params[self.model_param_specs['x0']['id']]
-
-    # @property
-    # def D(self):
-    #     return self._D
-
-    # def _format_D(self, value: TensorLikeFloat) -> Tensor:
-    #     value = torch.as_tensor(value, **self.factory_args)
-    #     assert value.ndim == 0 or len(value) == 1
-    #     return value.squeeze()
-
-    # @D.setter
-    # def D(self, value: TensorLikeFloat):
-    #     self._D = self._format_D(value)
-
-    # @property
-    # def rho(self):
-    #     return self._rho
-
-    # def _format_rho(self, value: TensorLikeFloat) -> Tensor:
-    #     value = torch.as_tensor(value, **self.factory_args)
-    #     assert value.ndim == 0 or len(value) == 1
-    #     return value.squeeze()
-
-    # @rho.setter
-    # def rho(self, value: TensorLikeFloat):
-    #     self._rho = self._format_rho(value)
-
     # @property
     # def x0(self):
-    #     return self._x0
+    #     return self._x0(self.parameters)
 
-    # def _format_x0(self, value: TensorLikeFloat) -> Tensor:
-    #     value = torch.as_tensor(value, **self.factory_args)
-    #     assert len(value) == self.dim
-    #     return value
-
-    # @x0.setter
-    # def x0(self, value: TensorLikeFloat):
-    #     self._x0 = self._format_x0(value)
-
-    # def parameters(self, log_transform: bool = False,
-    #                params_scale: Optional[Tensor] = None) -> Parameter:
-    #     """ Collect the parameters in a single tensor, return an Parameter.
-    #      Only used when calibrating the model. """
-    #     params = torch.cat(
-    #         [self.D.view(-1), self.rho.view(-1), self.x0], dim=0)
-    #     params = self._transform_parameters(
-    #         params, 'forward', log_transform, params_scale)
-    #     return Parameter(params, requires_grad=self.auto_grad)
-
-    # def _format_parameters(self, D: Optional[TensorLikeFloat] = None,
-    #                        rho: Optional[TensorLikeFloat] = None,
-    #                        x0: Optional[TensorLikeFloat] = None) -> Tensor:
-    #     """ Helper function to format a new set parameters. 
-    #     Ease the trial of new parameters. If not available,
-    #     return the current parameters. """
-        
-    #     D = self.D if D is None else self._format_D(D)
-    #     rho = self.rho if rho is None else self._format_rho(rho)
-    #     x0 = self.x0 if x0 is None else self._format_x0(x0)
-    #     return (D, rho, x0)
+    # def _x0(self, params):
+    #     return params[self.model_param_specs['x0']['id']]
 
     def _format_parameters(self, D: Optional[TensorLikeFloat] = None,
                            rho: Optional[TensorLikeFloat] = None,

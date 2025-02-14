@@ -1,9 +1,9 @@
-from numpy import ndarray
+from numpy.typing import ArrayLike 
 from torch import Tensor
 
 from typing import Union, List
 
-TensorLike = Union[ndarray, Tensor]
+TensorLike = Union[ArrayLike, Tensor]
 TensorLikeFloat = Union[List[float], TensorLike]
-NDArrayLikeFloat = Union[ndarray, List[float]]
-FloatLike = Union[float, int, ndarray[float]]  # ndarray must have shape (1,), but we cannot specify it
+NDArrayLikeFloat = Union[ArrayLike, List[float]]
+FloatLike = Union[float, int, ArrayLike]  # ndarray must have shape (1,), but we cannot specify it

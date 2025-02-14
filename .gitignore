@@ -1,9 +1,20 @@
+# data and result files
 **/data/
-**/results/
 **/plots*/
 **/gifs*/
+
+# intermediate data files
+**/*.mat
+
+# log files
 **/output_files/
 **/logs/
+
+# programming aux files
 **/__pycache__/
 **/*egg-info/
+**/.Rhistory
+**/.Rprofile
+
+# deprecated scripts
 **/deprecated/
