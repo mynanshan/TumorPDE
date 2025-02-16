@@ -57,8 +57,8 @@ def read_patient_data(patient: str, test: bool = False, mask_ids: List[int] = [1
         gm = zoom(gm, zoom_factors, order=1)
         wm = zoom(wm, zoom_factors, order=1)
         csf = zoom(csf, zoom_factors, order=1)
-        tumor1 = zoom(tumor1, zoom_factors, order=1)
-        tumor2 = zoom(tumor2, zoom_factors, order=1)
+        for i in range(len(tumor_list)):
+            tumor[i] = zoom(tumor[i], zoom_factors, order=1)
 
     return {
         "patient": patient,

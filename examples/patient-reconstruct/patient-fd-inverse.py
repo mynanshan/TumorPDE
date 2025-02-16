@@ -71,8 +71,7 @@ print(f"The current device is: {device}")
 import json
 from datetime import datetime
 
-from scan_utils import visualize_model_fit, visualize_model_fit_multiscan, weighted_center
-from expriment_helpers import read_patient_data, append_parameters_to_file
+from expriment_helpers import read_patient_data, append_parameters_to_file, visualize_model_fit, visualize_model_fit_multiscan, weighted_center
 
 ## ============================================================
 ##                         Load data
@@ -82,11 +81,14 @@ import argparse
 
 parser = argparse.ArgumentParser(description='Process patient data.')
 parser.add_argument('-p', '--patient', required=True, help='Patient identifier')
+parser.add_argument('-i', '--index', type=str, required=True, help="Indexes of scans.")
 parser.add_argument('-t', '--test', type=int, choices=[0, 1], required=True, help='Test mode (0 or 1)')
 parser.add_argument('-s', '--single_scan', type=int, choices=[0, 1], default=1,
                     required=False, help='Whether to run the single-scan calibration')
 parser.add_argument('-m', '--multi_scan', type=int, choices=[0, 1], default=1,
                     required=False, help='Whether to run the multi-scan calibration')
+parser.add_argument('-f', '--fixed_init', type=int, choices=[0, 1], default=0,
+                    required=False, help='Whether to run the fix-init calibration')
 parser.add_argument('-r', '--ref_scan', type=int, default=1,
                     required=False, help='Which scan is used as the ref_scan')
 args = parser.parse_args()
@@ -94,20 +96,26 @@ args = parser.parse_args()
 patient = args.patient
 print(f"Modelling Patient: {patient}")
 
-data = read_patient_data(patient, test=args.test, ref=args.ref_scan)
+# Convert the input string to a list of integers
+try:
+    indexes = list(map(int, args.index.split(',')))
+except ValueError:
+    print("Error: Please provide a valid comma-separated list of integers.")
+    return
+
+data = read_patient_data(patient, test=args.test, mask_ids=indexes, ref=args.ref_scan)
 
 dir_path = data["dir_path"]
 # brain = data["brain"]
-brain_raw = data["brain_raw"]
+brain_raw = data["t1"]
 gm = data["gm"]
 wm = data["wm"]
 csf = data["csf"]
-tumor1 = data["tumor1"]
-tumor2 = data["tumor2"]
-visualize_pos = data["visualize_pos"]
+tumor_list = data["tumor"]
 del data
 
-paramfile_path = os.path.join(dir_path, "parameters.txt")
+res_path = "./results"
+paramfile_path = os.path.join(res_path, "parameters.txt")
 
 print(f"Tumor array shape: {tumor1.shape}")
 print(f"Brain array shape: {brain_raw.shape}")
@@ -155,13 +163,13 @@ max_iter = 200
 if args.test == 1:
     max_iter = 20
 
-fd_pde = TumorInfiltraFD(geom, cx, D, rho,
-                    init_density_params=init_density_params, device=device)
+fd_pde = TumorInfiltraFD(
+    geom, D, rho, init_learnable_params=cx,
+    init_other_params=init_density_params, device=device)
 
 # method = "Nelder-Mead"
 method = "L-BFGS-B"
 
-fd_pde.compile(log_transform=True, rescale_params=True)
 
 if args.single_scan == 1:
 
@@ -178,7 +186,7 @@ if args.single_scan == 1:
     Initial parameters:
         D = {D}, rho={rho}, x0={cx}
     Calibrated parameters:
-        D = {result['D']}, rho={result['rho']}, x0={result['x0']}
+        D = {result['D']}, rho={result['rho']}, x0={result['init_params']}
     """)
 
     print("Start plotting")
@@ -187,16 +195,16 @@ if args.single_scan == 1:
     os.makedirs(plot_dir, exist_ok=True)
 
     u, _, _ = fd_pde.solve(
-        dt=0.001, t1=2 * t1, D=result['D'], rho=result['rho'], x0=result['x0'],
+        dt=0.001, t1=2 * t1, D=result['D'], rho=result['rho'], init_params=result['init_params'],
         plot_func=visualize_model_fit, plot_period=50,
         plot_args = {'save_dir': plot_dir, 'file_prefix': patient,
                     "brain": brain_raw, "tumor1": tumor1, "tumor2": tumor2,
-                    "slice_fracs": visualize_pos, "show": False, "main_title": patient},
+                    "show": False, "main_title": patient},
         save_all=False)
 
     append_parameters_to_file(
         paramfile_path, patient, "single scan",
-        result['D'].item(), result['rho'].item(), result['x0'].tolist())
+        result['D'].item(), result['rho'].item(), result['init_params'].tolist())
 
 if args.multi_scan == 1:
 
@@ -216,7 +224,7 @@ if args.multi_scan == 1:
     Initial parameters:
         D = {D}, rho={rho}, x0={cx}
     Calibrated parameters:
-        D = {result['D']}, rho={result['rho']}, x0={result['x0']}
+        D = {result['D']}, rho={result['rho']}, x0={result['init_params']}
         t_scan = {result['t_scan']}
     """)
     # Load the scan dates from the JSON file
