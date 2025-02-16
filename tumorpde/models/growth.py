@@ -71,7 +71,7 @@ class TumorInfiltraFD(TumorFixedFieldBase):
         # parameters with proper resizing are called working parameters
         self.rescale_params = False
         self.wkparams_min = torch.cat([
-            torch.tensor([0., 0.], **self.factory_args),
+            torch.tensor([1e-4, 1e-4], **self.factory_args),
             self.init_param_min.view(-1).clone()])
         self.wkparams_max = torch.cat([
             D.view(-1).clone(),
@@ -207,7 +207,7 @@ class TumorInfiltraFD(TumorFixedFieldBase):
         t_span = t1 - t0
 
         # temporal grid for the discretized pde
-        dt, nt, t1 = _spec_dt(dt, t_span, self.dx, D)
+        # dt, nt, t1 = _spec_dt(dt, t_span, self.dx, D)
 
         return self._solve_with_grad(obs, dt, t1, D, rho, init_params)
 

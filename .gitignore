@@ -16,6 +16,8 @@
 **/*egg-info/
 **/.Rhistory
 **/.Rprofile
+**/.vscode/
+**/.ropeproject
 
 # deprecated scripts
 **/deprecated/

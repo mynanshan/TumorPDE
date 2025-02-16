@@ -11,7 +11,7 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}/examples/patient-reconstruct",
-            "args": ["-p", "LY", "-t", "1", "-s", "0", "-m", "1"]
+            "args": ["-p", "NIU-HUI", "-i", "2,3", "-t", "1", "-s", "0", "-m", "0", "-f", "1", "-r", "3"]
         }
     ]
 }

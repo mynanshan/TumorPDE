@@ -295,7 +295,7 @@ if args.multi_scan == 1:
 if args.fixed_init == 1:
 
     def init_density_func(x, rmax = 0.1):
-        return rmax * torch.as_tensor(tumor_list[0] / tumor_list[0].max(), device=device).unsqueeze(0)
+        return rmax * torch.as_tensor(tumor_list[0] / tumor_list[0].max(), device=device)
 
     init_density_params = {"rmax": 0.1}
 
@@ -323,7 +323,7 @@ if args.fixed_init == 1:
 
     print("Start plotting")
 
-    plot_dir = os.path.join(res_path, "plots", patient)
+    plot_dir = os.path.join(res_path, "plots_fixinit", patient)
     os.makedirs(plot_dir, exist_ok=True)
 
     u, _, _ = fd_pde.solve(

@@ -136,17 +136,17 @@ def _vis_brain_scan(
         show: bool = True, file_prefix: str = "",
         save_dir: Optional[str] = None, idx: int = 0):
 
-    fig, ax = plt.subplots(nrows=3, ncols=3,
-                           figsize=(figsize[0]*3, figsize[1]*3))
-
     nrow = 4
     ncol = 4
+    fig, ax = plt.subplots(nrows=nrow, ncols=ncol,
+                           figsize=(figsize[0]*nrow, figsize[1]*ncol))
+
     slice_fracs = np.linspace(0.2, 0.8, nrow * ncol).reshape((nrow,ncol))
 
     for j in range(ncol):
         for i in range(nrow):
 
-            example_idx = int(brain.shape[j] * slice_fracs[j][i])
+            example_idx = int(brain.shape[2] * slice_fracs[j][i])
             sl = [slice(None)] * 3
             sl[2] = slice(example_idx, example_idx+1) # the axiel slice
             sl = tuple(sl)
