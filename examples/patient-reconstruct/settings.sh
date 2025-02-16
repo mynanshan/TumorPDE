@@ -4,3 +4,4 @@ export PATH=$PATH:~/projects/def-jiguocao/muye/softwares/ants-2.5.4/bin/
 
 DATA_DIR="../data/PatienTumorMultiScan2024"
 ATLAS_PATH="../data/Atlas"
+RESULT_DIR="./results"
