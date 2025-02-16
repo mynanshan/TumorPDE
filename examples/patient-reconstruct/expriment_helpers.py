@@ -61,6 +61,14 @@ def read_patient_data(patient: str, test: bool = False, mask_ids: List[int] = [1
         csf = zoom(csf, zoom_factors, order=1)
         for i in range(len(tumor_list)):
             tumor_list[i] = zoom(tumor_list[i], zoom_factors, order=1)
+    
+    print("Read data:")
+    print(f"Patient brain, shape: {brain.shape}")
+    print(f"Patient raw scan, shape: {raw_t1.shape}")
+    print(f"Grey matter, shape: {gm.shape}")
+    print(f"White matter, shape: {wm.shape}")
+    for i in range(len(tumor_list)):
+        print(f"Tumor mask {i+1}, shape: {tumor_list[i].shape}")
 
     return {
         "patient": patient,
