@@ -2,7 +2,6 @@
 #SBATCH --job-name=fd
 #SBATCH --account=def-jiguocao
 #SBATCH --nodes=1
-#SBATCH --gpus-per-node=1
 #SBATCH --cpus-per-task=16
 #SBATCH --mem-per-cpu=8G
 #SBATCH --time=12:00:00
@@ -95,7 +94,6 @@ parser.add_argument('-r', '--ref_scan', type=int, default=1,
 args = parser.parse_args()
 
 patient = args.patient
-print(f"Modelling Patient: {patient}")
 
 # Convert the input string to a list of integers
 try:
@@ -103,6 +101,9 @@ try:
 except ValueError:
     print("Error: Please provide a valid comma-separated list of integers.")
 indexes = list(map(int, args.index.split(',')))
+
+print(f"Modelling Patient: {patient}. Scan indexes {indexes}.")
+print(datetime.today())
 
 data = read_patient_data(patient, test=args.test, mask_ids=indexes, ref=args.ref_scan)
 
@@ -291,10 +292,10 @@ if args.multi_scan == 1:
         result['t_scan'][0])
 
 
-if args.fix_init == 1:
+if args.fixed_init == 1:
 
     def init_density_func(x, rmax = 0.1):
-        return torch.as_tensor(tumor_list[0] / tumor_list[0].max(), device=device).unsqueeze(0)
+        return rmax * torch.as_tensor(tumor_list[0] / tumor_list[0].max(), device=device).unsqueeze(0)
 
     init_density_params = {"rmax": 0.1}
 

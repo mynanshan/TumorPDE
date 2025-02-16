@@ -61,8 +61,22 @@ for i in range(num_scan + 1):
         ref_image = patient_t1
     else:
         # if processing the rest of the scans
-        patient_t1 = patient_t1.resample_image_to_target(
-            ref_image, interp_type='linear')
+        # patient_t1 = patient_t1.resample_image_to_target(
+        #     ref_image, interp_type='linear')
+
+        # Perform registration, aligning different scans
+        reg = ants.registration(
+            fixed=ref_image,
+            moving=patient_t1,
+            type_of_transform='Similarity', # only tranlation, rotation and scaling
+            mask=1.0 - tumor_mask,
+            outprefix=os.path.join(dir_path, f'{patient}{scan_id}_prereg_')
+        )
+
+        patient_t1 = reg['warpedmovout']
+        tumor_mask = ants.apply_transforms(
+            fixed=ref_image, moving=tumor_mask, transformlist=reg['fwdtransforms'])
+
 
     tumor_mask = tumor_mask.resample_image_to_target(patient_t1, interp_type='nearestNeighbor')
 

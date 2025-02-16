@@ -39,9 +39,10 @@ def read_patient_data(patient: str, test: bool = False, mask_ids: List[int] = [1
     csf, _, _ = ndarray_from_nifty(os.path.join(
         dir_path, patient, f'{patient}{ref}_csf_normalized.nii.gz'))
     tumor_list = []
-    for i in mask_ids:
-        tumor_list[i], _, _ = ndarray_from_nifty(os.path.join(
-            dir_path, patient, f'{patient}{i}_t1mask_resized.nii.gz'))
+    for ii in mask_ids:
+        tumor, _, _ = ndarray_from_nifty(os.path.join(
+            dir_path, patient, f'{patient}{ii}_t1mask_resized.nii.gz'))
+        tumor_list.append(tumor)
 
     # Ensure tumor2 matches tumor1 shape
     if len(tumor_list) > 1:
