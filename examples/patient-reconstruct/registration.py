@@ -1,9 +1,10 @@
 #!/project/6006512/muye/env/torch/bin/python
 #SBATCH --job-name=ants_registration     # Job name
+#SBATCH --output=logs/registration_%A_%a.out
 #SBATCH --account=def-jiguocao
 #SBATCH --ntasks=1                   # Number of tasks (1 per patient)
-#SBATCH --cpus-per-task=16            # Number of CPU cores per task (adjust as needed)
-#SBATCH --mem-per-cpu=4G                     # Memory per task (adjust as needed)
+#SBATCH --cpus-per-task=16           # Number of CPU cores per task (adjust as needed)
+#SBATCH --mem-per-cpu=4G             # Memory per task (adjust as needed)
 #SBATCH --time=01:00:00              # Time limit
 
 import ants
@@ -82,6 +83,9 @@ for i in range(num_scan + 1):
     patient_t1.plot(overlay=atlas_t1, overlay_alpha=0.6, overlay_cmap="Blues",
                     title='Before Registration', axis=2, nslices=16,
                     filename=os.path.join(dir_path, f'{patient}{scan_id}_before_register.jpg'))
+    patient_t1.plot(overlay=ref_image, overlay_alpha=0.3, overlay_cmap="Blues",
+                    title=f'Scan{scan_id} vs {ref_scan_id}', axis=2, nslices=16,
+                    filename=os.path.join(dir_path, f'{patient}{scan_id}_and_{ref_scan_id}.jpg'))
 
     # Perform registration
     reg = ants.registration(
