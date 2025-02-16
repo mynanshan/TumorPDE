@@ -35,7 +35,7 @@ def extract_info(filename):
 
 
 patient_img_folder = os.path.join(image_folder, patient)
-patient_output_folder = os.path.join(output_folder, patient)
+patient_output_folder = os.path.join(output_folder)
 
 if not os.path.exists(patient_img_folder):
     print(f"Patient {patient} not found")

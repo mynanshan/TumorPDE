@@ -37,7 +37,7 @@ while IFS=',' read -r name date1 date2 date3 datatype batchid numscan; do
 
     echo "Run gifmaker for patient:" "$name" "Experiment:" "$exprname"
 
-    input="${RESULT_DIR}/plots_${exprname}/${name}"
+    input="${RESULT_DIR}/plots_${exprname}"
     output="${RESULT_DIR}/gifs_${exprname}"
     mkdir -p "$output"
 
