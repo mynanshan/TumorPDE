@@ -5,7 +5,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem-per-cpu=2GB
 #SBATCH --time=1:00:00
-#SBATCH --output="gif-maker-%A_%a.out"
+#SBATCH --output="logs/gif-maker-%A_%a.out"
 
 from PIL import Image
 import os
