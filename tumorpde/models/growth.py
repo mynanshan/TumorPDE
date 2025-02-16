@@ -222,7 +222,7 @@ class TumorInfiltraFD(TumorFixedFieldBase):
         phi = torch.zeros(self.nx, **self.factory_args)  # phi = d u / d D
         psi = torch.zeros(self.nx, **self.factory_args)  # phi = d u / d rho
         eta = None if self.nparam_init == 0 else self.init_density_deriv(
-            self.x_mesh, init_params, **self.init_other_params)  # eta = d u / d x0
+            self.x_mesh, init_params, **self.init_other_params)  # eta = d u / d init_params
 
         # finite difference forward
         t0 = 0.
@@ -300,10 +300,10 @@ class TumorInfiltraFD(TumorFixedFieldBase):
             self, obs: Tensor, dt: float = 0.01, t1: float = 1.,
             D: Optional[TensorLikeFloat] = None,
             rho: Optional[TensorLikeFloat] = None,
-            x0: Optional[TensorLikeFloat] = None,
+            init_params: Optional[TensorLikeFloat] = None,
             epsilon: float = 1e-6) -> None:
 
-        params = self._format_parameters(D, rho, x0)
+        params = self._format_parameters(D, rho, init_params)
         wkparams = self._to_working_params(params)
 
         _, grads = self._calibrate_loss_grads(
@@ -404,7 +404,7 @@ class TumorInfiltraFD(TumorFixedFieldBase):
         # format an output
         result = {
             "D": self._D(params), "rho": self._rho(params),
-            "x0": self._init_params(params), "loss_history": loss_history
+            "init_params": self._init_params(params), "loss_history": loss_history
         }
 
         return result
@@ -437,7 +437,7 @@ class TumorInfiltraFD(TumorFixedFieldBase):
         params = self._format_parameters(D, rho, init_params)
         D = self._D(params)
         rho = self._rho(params)
-        x0 = self._init_params(params)
+        init_params = self._init_params(params)
         t0 = 0.
         assert t1 > t0
         t_span = t1 - t0
@@ -448,7 +448,7 @@ class TumorInfiltraFD(TumorFixedFieldBase):
         nscan = obs.shape[0]
         assert nscan > 1
 
-        return self._solve_with_grad_multiscan(obs, dt, t1, D, rho, x0)
+        return self._solve_with_grad_multiscan(obs, dt, t1, D, rho, init_params)
 
     def _solve_with_grad_multiscan(
             self, obs: Tensor, dt: float, t1: float,
@@ -471,7 +471,7 @@ class TumorInfiltraFD(TumorFixedFieldBase):
                 self.x_mesh, **self.init_other_params)
         phi = torch.zeros(self.nx, **self.factory_args)  # phi = d u / d D
         psi = torch.zeros(self.nx, **self.factory_args)  # phi = d u / d rho
-        # eta = d u / d x0
+        # eta = d u / d init_params
         eta = None if self.nparam_init==0 else self.init_density_deriv(
             self.x_mesh, init_params, **self.init_other_params)
         u_t = torch.zeros((nscan, *self.nx), **self.factory_args)
@@ -619,9 +619,8 @@ class TumorInfiltraFD(TumorFixedFieldBase):
         # format an output
         result = {
             "D": self._D(params), "rho": self._rho(params),
-            "x0": self._init_params(params), "loss_history": loss_history,
+            "init_params": self._init_params(params), "loss_history": loss_history,
             "t_scan": t_scan
         }
 
         return result
-
