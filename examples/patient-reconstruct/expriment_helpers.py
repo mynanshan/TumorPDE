@@ -6,7 +6,8 @@ from scipy.ndimage import zoom
 import datetime
 import csv
 
-import numpy as np, ndarray
+import numpy as np
+from numpy.typing import NDArray
 import matplotlib.pyplot as plt
 from torch import Tensor
 from typing import List, Optional, Tuple
@@ -58,7 +59,7 @@ def read_patient_data(patient: str, test: bool = False, mask_ids: List[int] = [1
         wm = zoom(wm, zoom_factors, order=1)
         csf = zoom(csf, zoom_factors, order=1)
         for i in range(len(tumor_list)):
-            tumor[i] = zoom(tumor[i], zoom_factors, order=1)
+            tumor_list[i] = zoom(tumor_list[i], zoom_factors, order=1)
 
     return {
         "patient": patient,
@@ -110,7 +111,7 @@ def ndarray_from_nifty(filename: str):
     return A, affine_info, header
 
 
-def weighted_center(u: ndarray) -> ndarray:
+def weighted_center(u: NDArray) -> NDArray:
     N = u.shape
     axis_indices = np.indices(N)
     weighted_sum = np.array([np.sum(u * I) for I in axis_indices])
@@ -119,8 +120,8 @@ def weighted_center(u: ndarray) -> ndarray:
 
 
 def _vis_brain_scan(
-        u: TensorLike, brain: ndarray,
-        tumor1: ndarray, tumor2: ndarray,
+        u: TensorLike, brain: NDArray,
+        tumor1: NDArray, tumor2: NDArray,
         figsize: Tuple[float, float],
         main_title: str, time_info: str = "",
         show: bool = True, file_prefix: str = "",
@@ -165,7 +166,7 @@ def _vis_brain_scan(
     fig.suptitle(f"{main_title} {time_info}", fontsize=20)
 
     # Adjust layout to make room for the main title
-    fig.tight_layout(rect=[0, 0, 1, 0.95])
+    fig.tight_layout(rect=(0., 0., 1., 0.95))
 
     if save_dir is not None:
         fig.savefig(f"{save_dir}/{file_prefix}-i{idx}.jpg")
@@ -177,7 +178,7 @@ def _vis_brain_scan(
 
 
 def visualize_model_fit(
-        u: TensorLike, idx: int, t: float, brain: ndarray, tumor1: ndarray, tumor2: ndarray,
+        u: TensorLike, idx: int, t: float, brain: NDArray, tumor1: NDArray, tumor2: NDArray,
         figsize: Tuple[float, float] = (5, 5), show: bool = True, main_title: str = "Patient",
         file_prefix: str = "", save_dir: Optional[str] = None):
 
@@ -193,7 +194,7 @@ def visualize_model_fit(
 
 
 def visualize_model_fit_multiscan(
-        u: TensorLike, idx: int, t: float, brain: ndarray, tumor1: ndarray, tumor2: ndarray,
+        u: TensorLike, idx: int, t: float, brain: NDArray, tumor1: NDArray, tumor2: NDArray,
         t_scan: List[float], real_t_diff: Optional[float] = None, time_unit: str = "day",
         figsize: Tuple[float, float] = (5, 5), show: bool = True, main_title: str = "Patient",
         file_prefix: str = "", save_dir: Optional[str] = None):

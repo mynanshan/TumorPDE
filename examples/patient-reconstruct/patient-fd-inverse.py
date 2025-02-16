@@ -70,6 +70,7 @@ print(f"The current device is: {device}")
 
 import json
 from datetime import datetime
+import pandas as pd
 
 from expriment_helpers import read_patient_data, append_parameters_to_file, visualize_model_fit, visualize_model_fit_multiscan, weighted_center
 
@@ -101,11 +102,11 @@ try:
     indexes = list(map(int, args.index.split(',')))
 except ValueError:
     print("Error: Please provide a valid comma-separated list of integers.")
-    return
+indexes = list(map(int, args.index.split(',')))
 
 data = read_patient_data(patient, test=args.test, mask_ids=indexes, ref=args.ref_scan)
 
-dir_path = data["dir_path"]
+data_path = data["dir_path"]
 # brain = data["brain"]
 brain_raw = data["t1"]
 gm = data["gm"]
@@ -114,10 +115,13 @@ csf = data["csf"]
 tumor_list = data["tumor"]
 del data
 
+if (len(tumor_list) <= 1):
+        raise ValueError("At least two scans are required.")
+
 res_path = "./results"
 paramfile_path = os.path.join(res_path, "parameters.txt")
 
-print(f"Tumor array shape: {tumor1.shape}")
+print(f"Tumor array shape: {tumor_list[0].shape}")
 print(f"Brain array shape: {brain_raw.shape}")
 
 ## ============================================================
@@ -131,7 +135,7 @@ print(f"Min check > gm: {gm.min()}, wm: {wm.min()}, csf: {csf.min()}")
 vox = (0.1 * gm + 0.9 * wm + 0.02 * csf).copy()
 del gm, wm, csf
 
-# Define the spatial domain 
+# Define the spatial domain
 # assume the voxel has equal width along each axis pixel
 # this is only valid when the image has been properly re-scaled
 geom = VolumeDomain(vox, [1.,1.,1.])
@@ -152,7 +156,7 @@ if args.test == 1:
 D = 100.
 if args.test == 1:
     D = 10.
-cx = weighted_center(tumor1) + 0.5  # initialized the center
+cx = weighted_center(tumor_list[0]) + 0.5  # initialized the center
 print(f"Initial location: {cx}")
 init_peak_height = 0.01
 init_peak_width = 2.
@@ -176,7 +180,8 @@ if args.single_scan == 1:
     print("Calibrating model for single scan")
 
     result = fd_pde.calibrate_model(
-        obs=torch.as_tensor(tumor1 / tumor1.max(), device=device), dt=0.001,
+        obs=torch.as_tensor(tumor_list[-1] / tumor_list[-1].max(), device=device),
+        dt=0.001,
         max_iter=max_iter, method=method,
         verbose=True, message_period=max_iter//10)
 
@@ -191,14 +196,14 @@ if args.single_scan == 1:
 
     print("Start plotting")
 
-    plot_dir = os.path.join(dir_path, "plots", patient)
+    plot_dir = os.path.join(res_path, "plots", patient)
     os.makedirs(plot_dir, exist_ok=True)
 
     u, _, _ = fd_pde.solve(
         dt=0.001, t1=2 * t1, D=result['D'], rho=result['rho'], init_params=result['init_params'],
         plot_func=visualize_model_fit, plot_period=50,
         plot_args = {'save_dir': plot_dir, 'file_prefix': patient,
-                    "brain": brain_raw, "tumor1": tumor1, "tumor2": tumor2,
+                    "brain": brain_raw, "tumor1": tumor_list[0], "tumor2": tumor_list[-1],
                     "show": False, "main_title": patient},
         save_all=False)
 
@@ -212,8 +217,7 @@ if args.multi_scan == 1:
 
     result = fd_pde.calibrate_model_multiscan(
         obs=torch.cat([
-            torch.as_tensor(tumor1 / tumor1.max(), device=device).unsqueeze(0),
-            torch.as_tensor(tumor2 / tumor2.max(), device=device).unsqueeze(0)
+            torch.as_tensor(tumor / tumor.max(), device=device).unsqueeze(0) for tumor in tumor_list
         ], dim=0), dt=0.001, max_iter=max_iter,
         prepare_stage=True if args.single_scan == 0 else False, max_iter_prepare=max_iter//2,
         method=method, verbose=True, message_period=max_iter//10)
@@ -227,18 +231,36 @@ if args.multi_scan == 1:
         D = {result['D']}, rho={result['rho']}, x0={result['init_params']}
         t_scan = {result['t_scan']}
     """)
-    # Load the scan dates from the JSON file
-    with open(os.path.join(dir_path, "scan-dates.json"),
-              'r', encoding='utf-8') as f:
-        scan_dates = json.load(f)
+
+    # Read the data into a pandas DataFrame
+    df = pd.read_csv(os.path.join(data_path, "patient_list.txt"))
+
+    # Function to extract and convert dates
+    def extract_and_convert_dates(name, indexes):
+        # Find the row corresponding to the name
+        row = df[df['name'] == name]
+
+        if row.empty:
+            return None
+
+        # Extract the relevant dates
+        dates = []
+        for i in indexes:
+            col_name = f'date{i}'
+            date_str = row[col_name].values[0]
+            if pd.notna(date_str):
+                date_obj = datetime.strptime(str(date_str), '%Y%m%d')
+                dates.append(date_obj)
+
+        return dates
 
     # Get the scan dates for the current patient
-    patient_scan_dates = scan_dates.get(patient)
+    patient_scan_dates = extract_and_convert_dates(patient, indexes)
 
     if patient_scan_dates:
         # Convert the scan dates to datetime objects
         scan_date1 = datetime.strptime(patient_scan_dates[0], "%Y%m%d").date()
-        scan_date2 = datetime.strptime(patient_scan_dates[1], "%Y%m%d").date()
+        scan_date2 = datetime.strptime(patient_scan_dates[-1], "%Y%m%d").date()
 
         # Calculate the difference between the two dates
         date_difference = float((scan_date2 - scan_date1).days)
@@ -250,24 +272,67 @@ if args.multi_scan == 1:
 
     print("Start plotting")
 
-    plot_dir = os.path.join(dir_path, "plots_multiscan", patient)
+    plot_dir = os.path.join(res_path, "plots_multiscan", patient)
     os.makedirs(plot_dir, exist_ok=True)
 
     u, _, _ = fd_pde.solve(
-        dt=0.001, t1=1.5*t1, D=result['D'], rho=result['rho'], x0=result['x0'],
+        dt=0.001, t1=1.5*t1, D=result['D'], rho=result['rho'], init_params=result['init_params'],
         plot_func=visualize_model_fit_multiscan, plot_period=50,
         plot_args = {'save_dir': plot_dir, 'file_prefix': patient,
-                    "brain": brain_raw, "tumor1": tumor1, "tumor2": tumor2,
+                    "brain": brain_raw, "tumor1": tumor_list[0], "tumor2": tumor_list[-1],
                     "t_scan": result['t_scan'], "real_t_diff": date_difference,
-                    "time_unit": "day",
-                    "slice_fracs": visualize_pos, "show": False,
+                    "time_unit": "day", "show": False,
                     "main_title": patient},
         save_all=False)
 
     append_parameters_to_file(
         paramfile_path, patient, "multi scan",
-        result['D'].item(), result['rho'].item(), result['x0'].tolist(),
+        result['D'].item(), result['rho'].item(), result['init_params'].tolist(),
         result['t_scan'][0])
 
 
+if args.fix_init == 1:
 
+    def init_density_func(x, rmax = 0.1):
+        return torch.as_tensor(tumor_list[0] / tumor_list[0].max(), device=device).unsqueeze(0)
+
+    init_density_params = {"rmax": 0.1}
+
+    fd_pde = TumorInfiltraFD(
+        geom, D, rho,
+        init_density_func=init_density_func,
+        init_other_params=init_density_params, device=device)
+
+    print("Calibrating model for single scan")
+
+    result = fd_pde.calibrate_model(
+        obs=torch.as_tensor(tumor_list[-1] / tumor_list[-1].max(), device=device),
+        dt=0.001,
+        max_iter=max_iter, method=method,
+        verbose=True, message_period=max_iter//10)
+
+    print("Finish calibration")
+
+    print(f"""
+    Initial parameters:
+        D = {D}, rho={rho},
+    Calibrated parameters:
+        D = {result['D']}, rho={result['rho']}
+    """)
+
+    print("Start plotting")
+
+    plot_dir = os.path.join(res_path, "plots", patient)
+    os.makedirs(plot_dir, exist_ok=True)
+
+    u, _, _ = fd_pde.solve(
+        dt=0.001, t1=2 * t1, D=result['D'], rho=result['rho'],
+        plot_func=visualize_model_fit, plot_period=50,
+        plot_args = {'save_dir': plot_dir, 'file_prefix': patient,
+                    "brain": brain_raw, "tumor1": tumor_list[0], "tumor2": tumor_list[-1],
+                    "show": False, "main_title": patient},
+        save_all=False)
+
+    append_parameters_to_file(
+        paramfile_path, patient, "fixed init",
+        result['D'].item(), result['rho'].item(), ["", "", ""])
