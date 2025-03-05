@@ -119,6 +119,12 @@ def ndarray_from_nifty(filename: str):
 
     return A, affine_info, header
 
+def binarize_img(img: NDArray, thresh: float = 0.5) -> NDArray:
+    
+    img = (img - img.min()) / (img.max() - img.min())
+    img[img > thresh] = 1.
+    img[img <= thresh] = 0.
+    return img
 
 def weighted_center(u: NDArray) -> NDArray:
     N = u.shape
@@ -150,15 +156,15 @@ def _vis_brain_scan(
             sl = [slice(None)] * 3
             sl[2] = slice(example_idx, example_idx+1) # the axiel slice
             sl = tuple(sl)
-            ax[j][i].imshow(brain[sl].squeeze(), cmap="gist_gray", vmin=0., vmax=1.)
+            ax[j][i].imshow(brain[sl].squeeze().T, cmap="gist_gray", vmin=0., vmax=1.)
             masked_tumor = np.ma.masked_where(
                 tumor1[sl].squeeze() < 0.5, tumor1[sl].squeeze())
-            ax[j][i].imshow(masked_tumor, cmap='Reds', alpha=0.3, vmin=0., vmax=1.)
+            ax[j][i].imshow(masked_tumor.T, cmap='Reds', alpha=0.3, vmin=0., vmax=1.)
             masked_tumor = np.ma.masked_where(
                 np.logical_or(tumor2[sl].squeeze() < 0.5,
                                tumor1[sl].squeeze() >= 0.5),
                 tumor2[sl].squeeze())
-            ax[j][i].imshow(masked_tumor, cmap='viridis',
+            ax[j][i].imshow(masked_tumor.T, cmap='viridis',
                             alpha=0.3, vmin=0., vmax=1.)
             masked_u = np.ma.masked_where(
                 u[sl].squeeze() < 1e-1, u[sl].squeeze())
@@ -168,7 +174,8 @@ def _vis_brain_scan(
             cmap = plt.get_cmap("Blues_r")
             rgba_u = cmap(masked_u)  # Apply the colormap
             rgba_u[..., -1] = alpha_channel  # Set the custom alpha channel
-            ax[j][i].imshow(rgba_u, alpha=0.9, vmin=0., vmax=1.)
+            ax[j][i].imshow(rgba_u.T, alpha=0.9, vmin=0., vmax=1.)
+            ax[j][i].gca().invert_yaxis()  # invert y-axis to match image coordinate system (origin at top-left)
             ax[j][i].set_title(f"Slice {slice_fracs[j][i]}")
 
     # Add a main title to all plots

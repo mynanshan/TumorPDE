@@ -32,14 +32,11 @@ del atlas_mask
 # Get patient ID from the command line
 patient = sys.argv[1]
 num_scan = int(sys.argv[2])
-ref_scan_id = int(sys.argv[3]) if len(sys.argv) > 3 else 1
 
-for i in range(num_scan + 1):
+# TODO: need a new registration algo for damaged brain
+for i in range(num_scan):
+    scan_id = i + 1
 
-    # process the ref scan in the 1st iteration
-    scan_id = i if i != 0 else ref_scan_id
-    if i == ref_scan_id:
-        continue
     print(f"Registering Patient: {patient} Scan ID: {scan_id}")
     dir_path = f"../data/PatienTumorMultiScan2024/{patient}/"
     patient_t1 = ants.image_read(os.path.join(
@@ -48,45 +45,26 @@ for i in range(num_scan + 1):
     tumor_mask = ants.image_read(os.path.join(
         dir_path, f'{patient}{scan_id}_t1mask.nii'))
 
-    # Resample patient image and tumor mask
-    if scan_id == ref_scan_id:
-        # if processing the ref scan
-        # Get the voxel sizes and resample parameters
-        voxel_sizes = patient_t1.spacing
-        min_spacing = min(voxel_sizes)
-        resample_params = (min_spacing, min_spacing, min_spacing)
+    # Resample image based on voxel spacings
+    voxel_sizes = patient_t1.spacing
+    min_spacing = min(voxel_sizes)
+    resample_params = (min_spacing, min_spacing, min_spacing)
 
-        patient_t1 = patient_t1.resample_image(
-            resample_params, use_voxels=False, interp_type=0)
-        ref_image = patient_t1
-    else:
-        # if processing the rest of the scans
-        # patient_t1 = patient_t1.resample_image_to_target(
-        #     ref_image, interp_type='linear')
-
-        # Perform registration, aligning different scans
-        reg = ants.registration(
-            fixed=ref_image,
-            moving=patient_t1,
-            type_of_transform='Similarity', # only tranlation, rotation and scaling
-            mask=1.0 - tumor_mask,
-            outprefix=os.path.join(dir_path, f'{patient}{scan_id}_prereg_')
-        )
-
-        patient_t1 = reg['warpedmovout']
-        tumor_mask = ants.apply_transforms(
-            fixed=ref_image, moving=tumor_mask, transformlist=reg['fwdtransforms'])
-
-
+    patient_t1 = patient_t1.resample_image(
+        resample_params, use_voxels=False, interp_type=0)
     tumor_mask = tumor_mask.resample_image_to_target(patient_t1, interp_type='nearestNeighbor')
-
-    # Resample atlas images to match patient image
-    atlas_t1 = atlas_t1.resample_image_to_target(patient_t1, interp_type='linear')
-    atlas_gm = atlas_gm.resample_image_to_target(patient_t1, interp_type='linear')
-    atlas_wm = atlas_wm.resample_image_to_target(patient_t1, interp_type='linear')
-    atlas_csf = atlas_csf.resample_image_to_target(
-        patient_t1, interp_type='linear')
-
+    
+    # Align images to the Atlas
+    reg = ants.registration(
+        fixed=atlas_t1,
+        moving=patient_t1,
+        type_of_transform='Similarity', # only tranlation, rotation and scaling
+        mask=1.0-tumor_mask,
+        outprefix=os.path.join(dir_path, f'{patient}{scan_id}_prereg_')
+    )
+    patient_t1 = reg['warpedmovout']
+    tumor_mask = ants.apply_transforms(
+        fixed=atlas_t1, moving=tumor_mask, transformlist=reg['fwdtransforms'])
 
     patient_t1.to_file(os.path.join(dir_path, f'{patient}{scan_id}_t1_resized.nii.gz'))
     tumor_mask.to_file(os.path.join(dir_path, f'{patient}{scan_id}_t1mask_resized.nii.gz'))
@@ -97,16 +75,13 @@ for i in range(num_scan + 1):
     patient_t1.plot(overlay=atlas_t1, overlay_alpha=0.6, overlay_cmap="Blues",
                     title='Before Registration', axis=2, nslices=16,
                     filename=os.path.join(dir_path, f'{patient}{scan_id}_before_register.jpg'))
-    patient_t1.plot(overlay=ref_image, overlay_alpha=0.3, overlay_cmap="Blues",
-                    title=f'Scan{scan_id} vs {ref_scan_id}', axis=2, nslices=16,
-                    filename=os.path.join(dir_path, f'{patient}{scan_id}_and_{ref_scan_id}.jpg'))
 
-    # Perform registration
+    # Perform registration, move Atlas into patient images
     reg = ants.registration(
         fixed=patient_t1,
         moving=atlas_t1,
-        type_of_transform='SyN', # 'Elastic'
-        mask=1.0 - tumor_mask,
+        type_of_transform='Elastic', # 'SyN'
+        mask=1.0-tumor_mask,
         outprefix=os.path.join(dir_path, f'{patient}{scan_id}_reg_')
     )
 

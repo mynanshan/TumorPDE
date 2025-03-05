@@ -54,6 +54,8 @@ multiscan |> View("Multi-scan Results")
 
 # fixed init
 
+metainfo = read.csv("../../data/PatienTumorMultiScan2024/patient_list.txt")
+# TODO: to be changed to use patient_list.txt
 dates = jsonlite::read_json("scan-dates.json")
 time_diff = sapply(dates, \(subj) {
   ymd(subj[[2]]) - ymd(subj[[1]])
