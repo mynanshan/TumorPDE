@@ -2,6 +2,7 @@ import os
 import numpy as np
 import nibabel as nib
 from scipy.ndimage import zoom
+from skimage import measure
 
 import datetime
 import csv
@@ -42,6 +43,7 @@ def read_patient_data(patient: str, test: bool = False, mask_ids: List[int] = [1
     for ii in mask_ids:
         tumor, _, _ = ndarray_from_nifty(os.path.join(
             dir_path, patient, f'{patient}{ii}_t1mask_resized.nii.gz'))
+        tumor = binarize_img(tumor)
         tumor_list.append(tumor)
 
     # Ensure tumor2 matches tumor1 shape
@@ -134,13 +136,74 @@ def weighted_center(u: NDArray) -> NDArray:
     return weighted_sum / total_weight
 
 
+# def _vis_brain_scan(
+#         u: TensorLike, brain: NDArray,
+#         tumor1: NDArray, tumor2: NDArray,
+#         figsize: Tuple[float, float],
+#         main_title: str, time_info: str = "",
+#         show: bool = True, file_prefix: str = "",
+#         save_dir: Optional[str] = None, idx: int = 0):
+
+#     nrow = 4
+#     ncol = 4
+#     fig, ax = plt.subplots(nrows=nrow, ncols=ncol,
+#                            figsize=(figsize[0]*nrow, figsize[1]*ncol))
+
+#     slice_fracs = np.linspace(0.2, 0.8, nrow * ncol).reshape((nrow,ncol))
+
+#     for j in range(ncol):
+#         for i in range(nrow):
+
+#             example_idx = int(brain.shape[2] * slice_fracs[j][i])
+#             sl = [slice(None)] * 3
+#             sl[2] = slice(example_idx, example_idx+1) # the axiel slice
+#             sl = tuple(sl)
+#             ax[j][i].imshow(brain[sl].squeeze().T, cmap="gist_gray", vmin=0., vmax=1.)
+#             masked_tumor = np.ma.masked_where(
+#                 tumor1[sl].squeeze() < 0.5, tumor1[sl].squeeze())
+#             ax[j][i].imshow(masked_tumor.T, cmap='Reds', alpha=0.3, vmin=0., vmax=1.)
+#             masked_tumor = np.ma.masked_where(
+#                 np.logical_or(tumor2[sl].squeeze() < 0.5,
+#                                tumor1[sl].squeeze() >= 0.5),
+#                 tumor2[sl].squeeze())
+#             ax[j][i].imshow(masked_tumor.T, cmap='viridis',
+#                             alpha=0.3, vmin=0., vmax=1.)
+#             masked_u = np.ma.masked_where(
+#                 u[sl].squeeze() < 1e-1, u[sl].squeeze())
+#             norm_u = (masked_u - masked_u.min()) / (masked_u.max() -
+#                                                     masked_u.min())  # Normalize to 0-1 range
+#             alpha_channel = np.minimum(norm_u, 0.6)
+#             cmap = plt.get_cmap("Blues_r")
+#             rgba_u = cmap(masked_u)  # Apply the colormap
+#             rgba_u[..., -1] = alpha_channel  # Set the custom alpha channel
+#             ax[j][i].imshow(rgba_u.T, alpha=0.9, vmin=0., vmax=1.)
+#             ax[j][i].invert_yaxis()  # invert y-axis to match image coordinate system (origin at top-left)
+#             ax[j][i].set_title(f"Slice {slice_fracs[j][i]}")
+
+#     # Add a main title to all plots
+#     fig.suptitle(f"{main_title} {time_info}", fontsize=20)
+
+#     # Adjust layout to make room for the main title
+#     fig.tight_layout(rect=(0., 0., 1., 0.95))
+
+#     if save_dir is not None:
+#         fig.savefig(f"{save_dir}/{file_prefix}-i{idx}.jpg")
+
+#     if show:
+#         plt.show()
+
+#     plt.close(fig)
+
+
 def _vis_brain_scan(
-        u: TensorLike, brain: NDArray,
+        u: NDArray, brain: NDArray,
         tumor1: NDArray, tumor2: NDArray,
         figsize: Tuple[float, float],
         main_title: str, time_info: str = "",
         show: bool = True, file_prefix: str = "",
         save_dir: Optional[str] = None, idx: int = 0):
+    
+    # tumor1, tumor2 need to be binarized tumor
 
     nrow = 4
     ncol = 4
@@ -152,29 +215,36 @@ def _vis_brain_scan(
     for j in range(ncol):
         for i in range(nrow):
 
+            # get the current slices
             example_idx = int(brain.shape[2] * slice_fracs[j][i])
             sl = [slice(None)] * 3
             sl[2] = slice(example_idx, example_idx+1) # the axiel slice
             sl = tuple(sl)
-            ax[j][i].imshow(brain[sl].squeeze().T, cmap="gist_gray", vmin=0., vmax=1.)
-            masked_tumor = np.ma.masked_where(
-                tumor1[sl].squeeze() < 0.5, tumor1[sl].squeeze())
-            ax[j][i].imshow(masked_tumor.T, cmap='Reds', alpha=0.3, vmin=0., vmax=1.)
-            masked_tumor = np.ma.masked_where(
-                np.logical_or(tumor2[sl].squeeze() < 0.5,
-                               tumor1[sl].squeeze() >= 0.5),
-                tumor2[sl].squeeze())
-            ax[j][i].imshow(masked_tumor.T, cmap='viridis',
-                            alpha=0.3, vmin=0., vmax=1.)
-            masked_u = np.ma.masked_where(
-                u[sl].squeeze() < 1e-1, u[sl].squeeze())
-            norm_u = (masked_u - masked_u.min()) / (masked_u.max() -
-                                                    masked_u.min())  # Normalize to 0-1 range
-            alpha_channel = np.minimum(norm_u, 0.6)
-            cmap = plt.get_cmap("Blues_r")
-            rgba_u = cmap(masked_u)  # Apply the colormap
-            rgba_u[..., -1] = alpha_channel  # Set the custom alpha channel
-            ax[j][i].imshow(rgba_u.T, alpha=0.9, vmin=0., vmax=1.)
+
+            brain_sl = brain[sl].squeeze()
+            tumor1_sl = tumor1[sl].squeeze()
+            tumor2_sl = tumor2[sl].squeeze()
+            u_sl = u[sl].squeeze()
+
+            # get contour of the tumor
+            tumor1_contours = measure.find_contours(tumor1_sl, level=0.5)
+            tumor2_contours = measure.find_contours(tumor2_sl, level=0.5)
+
+            # plot the underlay
+            ax[j][i].imshow(brain_sl.T, cmap="gist_gray", vmin=0., vmax=1.)
+
+            # plot tumor contours
+            for contour in tumor1_contours:
+                ax[j][i].plot(contour[:, 0], contour[:, 1], color='yellow', linewidth=1.1)
+            for contour in tumor2_contours:
+                ax[j][i].plot(contour[:, 0], contour[:, 1], color=(0.2,1.,0.2,1.), linewidth=1.2)
+            
+            # plot simulated tumor density
+            u_sl = np.ma.masked_where(u_sl < 1e-4, u_sl)
+            rgba_u = np.zeros((u_sl.T.shape[0], u_sl.T.shape[1], 4))
+            rgba_u[..., 0] = 1.0  # red
+            rgba_u[..., 3] = (u_sl.T) * 0.4  # transparency 
+            ax[j][i].imshow(rgba_u, vmin=0., vmax=1.)
             ax[j][i].invert_yaxis()  # invert y-axis to match image coordinate system (origin at top-left)
             ax[j][i].set_title(f"Slice {slice_fracs[j][i]}")
 

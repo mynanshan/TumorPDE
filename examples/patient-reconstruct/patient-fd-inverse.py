@@ -71,7 +71,10 @@ import json
 from datetime import datetime
 import pandas as pd
 
-from expriment_helpers import read_patient_data, append_parameters_to_file, visualize_model_fit, visualize_model_fit_multiscan, weighted_center
+from expriment_helpers import read_patient_data, weighted_center
+from expriment_helpers import visualize_model_fit, visualize_model_fit_multiscan
+from expriment_helpers import append_parameters_to_file
+
 
 ## ============================================================
 ##                         Load data
@@ -181,7 +184,7 @@ if args.single_scan == 1:
     print("Calibrating model for single scan")
 
     result = fd_pde.calibrate_model(
-        obs=torch.as_tensor(tumor_list[-1] / tumor_list[-1].max(), device=device),
+        obs=torch.as_tensor(tumor_list[-1], device=device),
         dt=0.001,
         max_iter=max_iter, method=method,
         verbose=True, message_period=max_iter//10)
@@ -218,7 +221,7 @@ if args.multi_scan == 1:
 
     result = fd_pde.calibrate_model_multiscan(
         obs=torch.cat([
-            torch.as_tensor(tumor / tumor.max(), device=device).unsqueeze(0) for tumor in tumor_list
+            torch.as_tensor(tumor, device=device).unsqueeze(0) for tumor in tumor_list
         ], dim=0), dt=0.001, max_iter=max_iter,
         prepare_stage=True if args.single_scan == 0 else False, max_iter_prepare=max_iter//2,
         method=method, verbose=True, message_period=max_iter//10)
@@ -295,7 +298,7 @@ if args.multi_scan == 1:
 if args.fixed_init == 1:
 
     def init_density_func(x, rmax = 0.1):
-        return rmax * torch.as_tensor(tumor_list[0] / tumor_list[0].max(), device=device)
+        return rmax * torch.as_tensor(tumor_list[0], device=device)
 
     init_density_params = {"rmax": 0.1}
 
@@ -307,7 +310,7 @@ if args.fixed_init == 1:
     print("Calibrating model for single scan")
 
     result = fd_pde.calibrate_model(
-        obs=torch.as_tensor(tumor_list[-1] / tumor_list[-1].max(), device=device),
+        obs=torch.as_tensor(tumor_list[-1], device=device),
         dt=0.001,
         max_iter=max_iter, method=method,
         verbose=True, message_period=max_iter//10)
