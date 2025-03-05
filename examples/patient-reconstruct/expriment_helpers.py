@@ -175,7 +175,7 @@ def _vis_brain_scan(
             rgba_u = cmap(masked_u)  # Apply the colormap
             rgba_u[..., -1] = alpha_channel  # Set the custom alpha channel
             ax[j][i].imshow(rgba_u.T, alpha=0.9, vmin=0., vmax=1.)
-            ax[j][i].gca().invert_yaxis()  # invert y-axis to match image coordinate system (origin at top-left)
+            ax[j][i].invert_yaxis()  # invert y-axis to match image coordinate system (origin at top-left)
             ax[j][i].set_title(f"Slice {slice_fracs[j][i]}")
 
     # Add a main title to all plots
