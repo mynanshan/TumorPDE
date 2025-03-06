@@ -94,6 +94,8 @@ parser.add_argument('-f', '--fixed_init', type=int, choices=[0, 1], default=0,
                     required=False, help='Whether to run the fix-init calibration')
 parser.add_argument('-r', '--ref_scan', type=int, default=1,
                     required=False, help='Which scan is used as the ref_scan')
+parser.add_argument('-u', '--underlay', type=int, choices=[1, 2], default=1,
+                    required=False, help='Which image is used as the underlay. 1: original scan, 2: diffusion field.')
 args = parser.parse_args()
 
 patient = args.patient
@@ -279,10 +281,17 @@ if args.fixed_init == 1:
     plot_dir = os.path.join(res_path, "plots_fixinit", patient)
     os.makedirs(plot_dir, exist_ok=True)
 
+    if args.underlay == 1:
+        underlay = brain_raw
+    elif args.underlay == 2:
+        underlay = vox
+    else:
+        raise ValueError("Unknown underlay code.")
+
     u, _, _ = fd_pde.solve(
-        dt=0.001, t1=1.5 * t1, D=D, rho=rho,
+        dt=0.001, t1=1.2 * t1, D=D, rho=rho,
         plot_func=visualize_model_fit, plot_period=50,
         plot_args = {'save_dir': plot_dir, 'file_prefix': patient,
-                    "brain": brain_raw, "tumor1": tumor_list[0], "tumor2": tumor_list[-1],
+                    "brain": underlay, "tumor1": tumor_list[0], "tumor2": tumor_list[-1],
                     "show": False, "main_title": patient},
         save_all=False)
