@@ -1,12 +1,12 @@
 
 #!/project/6006512/muye/env/torch/bin/python
-#SBATCH --job-name=fd
+#SBATCH --job-name=fd-forward
 #SBATCH --account=def-jiguocao
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=16
 #SBATCH --mem-per-cpu=8G
 #SBATCH --time=12:00:00
-#SBATCH --output="output_files/patient-fd-%j.out"
+#SBATCH --output="output_files/patient-forward-%j.out"
 
 
 # import psutil
@@ -86,7 +86,6 @@ import argparse
 parser = argparse.ArgumentParser(description='Process patient data.')
 parser.add_argument('-p', '--patient', required=True, help='Patient identifier')
 parser.add_argument('-i', '--index', type=str, required=True, help="Indexes of scans.")
-parser.add_argument('-t', '--test', type=int, choices=[0, 1], required=True, help='Test mode (0 or 1)')
 parser.add_argument('-s', '--single_scan', type=int, choices=[0, 1], default=1,
                     required=False, help='Whether to run the single-scan calibration')
 parser.add_argument('-m', '--multi_scan', type=int, choices=[0, 1], default=1,
@@ -186,7 +185,7 @@ if args.single_scan == 1:
     os.makedirs(plot_dir, exist_ok=True)
 
     u, _, _ = fd_pde.solve(
-        dt=0.001, t1=1.5 * t1, D=D, rho=rho, init_params=cx,
+        dt=0.001, t1=1.2 * t1, D=D, rho=rho, init_params=cx,
         plot_func=visualize_model_fit, plot_period=50,
         plot_args = {'save_dir': plot_dir, 'file_prefix': patient,
                     "brain": brain_raw, "tumor1": tumor_list[0], "tumor2": tumor_list[-1],
@@ -253,7 +252,7 @@ if args.multi_scan == 1:
     os.makedirs(plot_dir, exist_ok=True)
 
     u, _, _ = fd_pde.solve(
-        dt=0.001, t1=1.5*t1, D=D, rho=rho, init_params=cx,
+        dt=0.001, t1=1.2*t1, D=D, rho=rho, init_params=cx,
         plot_func=visualize_model_fit_multiscan, plot_period=50,
         plot_args = {'save_dir': plot_dir, 'file_prefix': patient,
                     "brain": brain_raw, "tumor1": tumor_list[0], "tumor2": tumor_list[-1],

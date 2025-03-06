@@ -243,8 +243,14 @@ def _vis_brain_scan(
             u_sl = np.ma.masked_where(u_sl < 1e-4, u_sl)
             rgba_u = np.zeros((u_sl.T.shape[0], u_sl.T.shape[1], 4))
             rgba_u[..., 0] = 1.0  # red
-            rgba_u[..., 3] = (u_sl.T) * 0.4  # transparency 
+            rgba_u[..., 3] = np.sqrt(u_sl.T) * 0.3  # transparency 
             ax[j][i].imshow(rgba_u, vmin=0., vmax=1.)
+
+            # plot thresholded contour
+            u_contours = measure.find_contours(u_sl, level=0.5)
+            for contour in u_contours:
+                ax[j][i].plot(contour[:, 0], contour[:, 1], color='red', linewidth=1.1)
+
             ax[j][i].invert_yaxis()  # invert y-axis to match image coordinate system (origin at top-left)
             ax[j][i].set_title(f"Slice {slice_fracs[j][i]}")
 

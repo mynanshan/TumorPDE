@@ -3,7 +3,7 @@
 source settings.sh
 
 # Define the setting file
-ref_id_file="registration_ref_id.txt"
+# ref_id_file="registration_ref_id.txt"
 # Define the metainfo file
 metainfo="${DATA_DIR}/patient_list.txt"
 
@@ -17,11 +17,11 @@ else
     exit 1
 fi
 
-# Read ref_id.txt into an associative array
-declare -A ref_ids
-while IFS=',' read -r patient ref_id; do
-    ref_ids["$patient"]=$ref_id
-done < "$ref_id_file"
+# # Read ref_id.txt into an associative array
+# declare -A ref_ids
+# while IFS=',' read -r patient ref_id; do
+#     ref_ids["$patient"]=$ref_id
+# done < "$ref_id_file"
 
 # Loop through each line in the input file
 while IFS=',' read -r name date1 date2 date3 datatype batchid numscan; do
@@ -35,14 +35,17 @@ while IFS=',' read -r name date1 date2 date3 datatype batchid numscan; do
         continue  # Skip to the next iteration
     fi
 
-    # Check if the patient exists in the ref_id associative array
-    if [[ -n "${ref_ids[$name]}" ]]; then
-        ref_id="${ref_ids[$name]}"
-    else
-        ref_id=1
-    fi
+    # # Check if the patient exists in the ref_id associative array
+    # if [[ -n "${ref_ids[$name]}" ]]; then
+    #     ref_id="${ref_ids[$name]}"
+    # else
+    #     ref_id=1
+    # fi
 
+    # # Submit the job using sbatch with patient and scan_id as arguments
+    # echo "Run registration for patient:" "$name" "num scans:" "$numscan" "ref id:" "$ref_id"
+    # sbatch registration.py "$name" "$numscan" "$ref_id"
     # Submit the job using sbatch with patient and scan_id as arguments
-    echo "Run registration for patient:" "$name" "num scans:" "$numscan" "ref id:" "$ref_id"
-    sbatch registration.py "$name" "$numscan" "$ref_id"
+    echo "Run registration for patient:" "$name" "num scans:" "$numscan"
+    sbatch registration.py "$name" "$numscan"
 done < "$metainfo"
