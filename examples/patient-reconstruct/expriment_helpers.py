@@ -312,3 +312,74 @@ def visualize_model_fit_multiscan(
 
     _vis_brain_scan(u, brain, tumor1, tumor2, figsize, main_title, time_info,
                     show=show, file_prefix=file_prefix, save_dir=save_dir, idx=idx)
+
+
+def _vis_brain_scan_2d(
+        u: NDArray, brain: NDArray,
+        tumor1: NDArray, tumor2: NDArray,
+        figsize: Tuple[float, float],
+        main_title: str, time_info: str = "",
+        show: bool = True, file_prefix: str = "",
+        save_dir: Optional[str] = None, idx: int = 0):
+    
+    # tumor1, tumor2 need to be binarized tumor
+    nrow = 1
+    ncol = 1
+    fig, ax = plt.subplots(nrows=nrow, ncols=ncol, figsize=(figsize[0], figsize[1]))
+
+    # get contour of the tumor
+    tumor1_contours = measure.find_contours(tumor1, level=0.5)
+    tumor2_contours = measure.find_contours(tumor2, level=0.5)
+
+    # plot the underlay
+    ax.imshow(brain.T, cmap="gist_gray", vmin=0., vmax=1.)
+
+    # plot tumor contours
+    for contour in tumor1_contours:
+        ax.plot(contour[:, 0], contour[:, 1], color='yellow', linewidth=1.1)
+    for contour in tumor2_contours:
+        ax.plot(contour[:, 0], contour[:, 1], color=(0.2,1.,0.2,1.), linewidth=1.2)
+    
+    # plot simulated tumor density
+    u = np.ma.masked_where(u < 1e-4, u)
+    rgba_u = np.zeros((u.T.shape[0], u.T.shape[1], 4))
+    rgba_u[..., 0] = 1.0  # red
+    rgba_u[..., 3] = np.sqrt(u.T) * 0.3  # transparency 
+    ax.imshow(rgba_u, vmin=0., vmax=1.)
+
+    # plot thresholded contour
+    u_contours = measure.find_contours(u, level=0.5)
+    for contour in u_contours:
+        ax.plot(contour[:, 0], contour[:, 1], color='red', linewidth=1.1)
+
+    ax.invert_yaxis()  # invert y-axis to match image coordinate system (origin at top-left)
+
+    # Add a main title to all plots
+    fig.suptitle(f"{main_title} {time_info}", fontsize=20)
+
+    # Adjust layout to make room for the main title
+    fig.tight_layout(rect=(0., 0., 1., 0.95))
+
+    if save_dir is not None:
+        fig.savefig(f"{save_dir}/{file_prefix}-i{idx}.jpg")
+
+    if show:
+        plt.show()
+
+    plt.close(fig)
+
+
+def visualize_model_fit_2d(
+        u: TensorLike, idx: int, t: float, brain: NDArray, tumor1: NDArray, tumor2: NDArray,
+        figsize: Tuple[float, float] = (5, 5), show: bool = True, main_title: str = "Patient",
+        file_prefix: str = "", save_dir: Optional[str] = None):
+
+    if isinstance(u, Tensor):
+        u = u.detach().cpu().numpy()
+    u = np.asarray(u)
+
+    brain = 0.8 * brain / brain.max()
+    time_info = f"t={round(t, 3)}"
+
+    _vis_brain_scan_2d(u, brain, tumor1, tumor2, figsize, main_title, time_info,
+                    show=show, file_prefix=file_prefix, save_dir=save_dir, idx=idx)
