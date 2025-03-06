@@ -1,3 +1,4 @@
+
 #!/project/6006512/muye/env/torch/bin/python
 #SBATCH --job-name=fd
 #SBATCH --account=def-jiguocao
@@ -152,28 +153,13 @@ t0, t1 = 0., 1.
 ##                   FD Forward Simulation
 ## ------------------------------------------------------------
 
+# read parameters
+params_records = pd.read_csv("results/parameters.txt")
+first_record = params_records[params_records['Patient'] == patient].iloc[0]
 
 # set up parameters
-rho = 20.
-if args.test == 1:
-    rho = 2.
-D = 100.
-if args.test == 1:
-    D = 10.
-cx = weighted_center(tumor_list[0]) + 0.5  # initialized the center
-print(f"Initial location: {cx}")
-init_peak_height = 0.01
-init_peak_width = 2.
-init_density_params  = {"w": init_peak_width, "h": init_peak_height, "rmax": 4.}
-if args.test == 1:
-    init_density_params['rmax'] = 1.
-max_iter = 200
-if args.test == 1:
-    max_iter = 20
-
-fd_pde = TumorInfiltraFD(
-    geom, D, rho, init_learnable_params=cx,
-    init_other_params=init_density_params, device=device)
+rho = first_record['rho']
+D = first_record['D']
 
 # method = "Nelder-Mead"
 method = "L-BFGS-B"
@@ -183,20 +169,16 @@ if args.single_scan == 1:
 
     print("Calibrating model for single scan")
 
-    result = fd_pde.calibrate_model(
-        obs=torch.as_tensor(tumor_list[-1], device=device),
-        dt=0.001,
-        max_iter=max_iter, method=method,
-        verbose=True, message_period=max_iter//10)
+    cx = (first_record['x0[0]'], first_record['x0[1]'], first_record['x0[2]'])
+    print(f"Initial location: {cx}")
+    init_peak_height = 0.01
+    init_peak_width = 2.
+    init_density_params  = {"w": init_peak_width, "h": init_peak_height, "rmax": 4.}
+    max_iter = 200
 
-    print("Finish calibration")
-
-    print(f"""
-    Initial parameters:
-        D = {D}, rho={rho}, x0={cx}
-    Calibrated parameters:
-        D = {result['D']}, rho={result['rho']}, x0={result['init_params']}
-    """)
+    fd_pde = TumorInfiltraFD(
+        geom, D, rho, init_learnable_params=cx,
+        init_other_params=init_density_params, device=device)
 
     print("Start plotting")
 
@@ -204,37 +186,28 @@ if args.single_scan == 1:
     os.makedirs(plot_dir, exist_ok=True)
 
     u, _, _ = fd_pde.solve(
-        dt=0.001, t1=1.5 * t1, D=result['D'], rho=result['rho'], init_params=result['init_params'],
+        dt=0.001, t1=1.5 * t1, D=D, rho=rho, init_params=cx,
         plot_func=visualize_model_fit, plot_period=50,
         plot_args = {'save_dir': plot_dir, 'file_prefix': patient,
                     "brain": brain_raw, "tumor1": tumor_list[0], "tumor2": tumor_list[-1],
                     "show": False, "main_title": patient},
         save_all=False)
 
-    append_parameters_to_file(
-        paramfile_path, patient, "single scan",
-        result['D'].item(), result['rho'].item(), result['init_params'].tolist())
-
 if args.multi_scan == 1:
 
     print("Calibrating model for multi-scan")
 
-    result = fd_pde.calibrate_model_multiscan(
-        obs=torch.cat([
-            torch.as_tensor(tumor, device=device).unsqueeze(0) for tumor in tumor_list
-        ], dim=0), dt=0.001, max_iter=max_iter,
-        prepare_stage=True if args.single_scan == 0 else False, max_iter_prepare=max_iter//2,
-        method=method, verbose=True, message_period=max_iter//10)
+    cx = (first_record['x0[0]'], first_record['x0[1]'], first_record['x0[2]'])
+    t1 = first_record['t1']
+    print(f"Initial location: {cx}")
+    init_peak_height = 0.01
+    init_peak_width = 2.
+    init_density_params  = {"w": init_peak_width, "h": init_peak_height, "rmax": 4.}
+    max_iter = 200
 
-    print("Finish calibration")
-
-    print(f"""
-    Initial parameters:
-        D = {D}, rho={rho}, x0={cx}
-    Calibrated parameters:
-        D = {result['D']}, rho={result['rho']}, x0={result['init_params']}
-        t_scan = {result['t_scan']}
-    """)
+    fd_pde = TumorInfiltraFD(
+        geom, D, rho, init_learnable_params=cx,
+        init_other_params=init_density_params, device=device)
 
     # Read the data into a pandas DataFrame
     df = pd.read_csv(os.path.join(data_path, "patient_list.txt"))
@@ -280,19 +253,14 @@ if args.multi_scan == 1:
     os.makedirs(plot_dir, exist_ok=True)
 
     u, _, _ = fd_pde.solve(
-        dt=0.001, t1=1.5*t1, D=result['D'], rho=result['rho'], init_params=result['init_params'],
+        dt=0.001, t1=1.5*t1, D=D, rho=rho, init_params=cx,
         plot_func=visualize_model_fit_multiscan, plot_period=50,
         plot_args = {'save_dir': plot_dir, 'file_prefix': patient,
                     "brain": brain_raw, "tumor1": tumor_list[0], "tumor2": tumor_list[-1],
-                    "t_scan": result['t_scan'], "real_t_diff": date_difference,
+                    "t_scan": [t1, 1.], "real_t_diff": date_difference,
                     "time_unit": "day", "show": False,
                     "main_title": patient},
         save_all=False)
-
-    append_parameters_to_file(
-        paramfile_path, patient, "multi scan",
-        result['D'].item(), result['rho'].item(), result['init_params'].tolist(),
-        result['t_scan'][0])
 
 
 if args.fixed_init == 1:
@@ -307,36 +275,15 @@ if args.fixed_init == 1:
         init_density_func=init_density_func,
         init_other_params=init_density_params, device=device)
 
-    print("Calibrating model for single scan")
-
-    result = fd_pde.calibrate_model(
-        obs=torch.as_tensor(tumor_list[-1], device=device),
-        dt=0.001,
-        max_iter=max_iter, method=method,
-        verbose=True, message_period=max_iter//10)
-
-    print("Finish calibration")
-
-    print(f"""
-    Initial parameters:
-        D = {D}, rho={rho},
-    Calibrated parameters:
-        D = {result['D']}, rho={result['rho']}
-    """)
-
     print("Start plotting")
 
     plot_dir = os.path.join(res_path, "plots_fixinit", patient)
     os.makedirs(plot_dir, exist_ok=True)
 
     u, _, _ = fd_pde.solve(
-        dt=0.001, t1=1.5 * t1, D=result['D'], rho=result['rho'],
+        dt=0.001, t1=1.5 * t1, D=D, rho=rho,
         plot_func=visualize_model_fit, plot_period=50,
         plot_args = {'save_dir': plot_dir, 'file_prefix': patient,
                     "brain": brain_raw, "tumor1": tumor_list[0], "tumor2": tumor_list[-1],
                     "show": False, "main_title": patient},
         save_all=False)
-
-    append_parameters_to_file(
-        paramfile_path, patient, "fixed init",
-        result['D'].item(), result['rho'].item(), ["", "", ""])
