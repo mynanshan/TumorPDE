@@ -138,7 +138,7 @@ print(f"Brain array shape: {brain_raw.shape}")
 # formulate the diffusivity field
 print(f"Max check > gm: {gm.max()}, wm: {wm.max()}, csf: {csf.max()}")
 print(f"Min check > gm: {gm.min()}, wm: {wm.min()}, csf: {csf.min()}")
-vox = (0.1 * gm + 0.9 * wm + 0.02 * csf).copy()
+vox = (0.05 * gm + 0.94 * wm + 0.01 * csf).copy()
 del gm, wm, csf
 
 # Define the spatial domain
