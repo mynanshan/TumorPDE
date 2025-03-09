@@ -14,12 +14,16 @@ from torch import Tensor
 from typing import List, Optional, Tuple
 from tumorpde._typing import TensorLike
 
-def resize_to_match(target, source):
-    """
-    Resizes the `source` array to match the shape of the `target` array.
-    """
-    zoom_factors = np.array(target.shape) / np.array(source.shape)
-    return zoom(source, zoom_factors, order=1)
+
+def ndarray_from_nifty(filename: str):
+
+    nifti_file = filename
+    img = nib.load(nifti_file)
+    A = img.get_fdata()
+    affine_info = img.affine
+    header = img.header
+
+    return A, affine_info, header
 
 def read_patient_data(patient: str, test: bool = False, mask_ids: List[int] = [1,2], ref: int = 1):
 
@@ -85,6 +89,27 @@ def read_patient_data(patient: str, test: bool = False, mask_ids: List[int] = [1
         "header": header
     }
 
+def resize_to_match(target, source):
+    """
+    Resizes the `source` array to match the shape of the `target` array.
+    """
+    zoom_factors = np.array(target.shape) / np.array(source.shape)
+    return zoom(source, zoom_factors, order=1)
+
+def binarize_img(img: NDArray, thresh: float = 0.5) -> NDArray:
+    
+    img = (img - img.min()) / (img.max() - img.min())
+    img[img > thresh] = 1.
+    img[img <= thresh] = 0.
+    return img
+
+def weighted_center(u: NDArray) -> NDArray:
+    N = u.shape
+    axis_indices = np.indices(N)
+    weighted_sum = np.array([np.sum(u * I) for I in axis_indices])
+    total_weight = np.sum(u)
+    return weighted_sum / total_weight
+
 
 def append_parameters_to_file(file_path, patient, experiment_type, D, rho, x0, t1=None):
     current_datetime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -110,31 +135,6 @@ def append_parameters_to_file(file_path, patient, experiment_type, D, rho, x0, t
     with open(file_path, 'w', newline='') as f:
         writer = csv.writer(f, delimiter='\t')
         writer.writerows(existing_rows)
-
-def ndarray_from_nifty(filename: str):
-
-    nifti_file = filename
-    img = nib.load(nifti_file)
-    A = img.get_fdata()
-    affine_info = img.affine
-    header = img.header
-
-    return A, affine_info, header
-
-def binarize_img(img: NDArray, thresh: float = 0.5) -> NDArray:
-    
-    img = (img - img.min()) / (img.max() - img.min())
-    img[img > thresh] = 1.
-    img[img <= thresh] = 0.
-    return img
-
-def weighted_center(u: NDArray) -> NDArray:
-    N = u.shape
-    axis_indices = np.indices(N)
-    weighted_sum = np.array([np.sum(u * I) for I in axis_indices])
-    total_weight = np.sum(u)
-    return weighted_sum / total_weight
-
 
 # def _vis_brain_scan(
 #         u: TensorLike, brain: NDArray,
@@ -196,104 +196,133 @@ def weighted_center(u: NDArray) -> NDArray:
 
 
 def _vis_brain_scan(
-        u: NDArray, brain: NDArray,
-        tumor1: NDArray, tumor2: NDArray,
+        u: NDArray,
+        underlays: List[NDArray],
+        tumors: List[NDArray],
         figsize: Tuple[float, float],
-        main_title: str, time_info: str = "",
-        show: bool = True, file_prefix: str = "",
+        main_title: str,
+        time_info: str = "",
+        show: bool = True,
+        file_prefix: List[str] = [""],
         save_dir: Optional[str] = None, idx: int = 0):
     
-    # tumor1, tumor2 need to be binarized tumor
-
     nrow = 4
     ncol = 4
-    fig, ax = plt.subplots(nrows=nrow, ncols=ncol,
-                           figsize=(figsize[0]*nrow, figsize[1]*ncol))
-
     slice_fracs = np.linspace(0.2, 0.8, nrow * ncol).reshape((nrow,ncol))
+    tumor_colors = ["yellow", (0.2,1.,0.2,1.), (0.2,0.2,1.,1.)]
+    
+    for img, fpre in zip(underlays, file_prefix):
 
-    for j in range(ncol):
-        for i in range(nrow):
+        img = 0.8 * img / img.max()
 
-            # get the current slices
-            example_idx = int(brain.shape[2] * slice_fracs[j][i])
-            sl = [slice(None)] * 3
-            sl[2] = slice(example_idx, example_idx+1) # the axiel slice
-            sl = tuple(sl)
+        fig, ax = plt.subplots(
+            nrows=nrow, ncols=ncol,
+            figsize=(figsize[0]*nrow, figsize[1]*ncol))
 
-            brain_sl = brain[sl].squeeze()
-            tumor1_sl = tumor1[sl].squeeze()
-            tumor2_sl = tumor2[sl].squeeze()
-            u_sl = u[sl].squeeze()
+        for j in range(ncol):
+            for i in range(nrow):
 
-            # get contour of the tumor
-            tumor1_contours = measure.find_contours(tumor1_sl, level=0.5)
-            tumor2_contours = measure.find_contours(tumor2_sl, level=0.5)
+                # get the current slices
+                example_idx = int(img.shape[2] * slice_fracs[j][i])
+                sl = [slice(None)] * 3
+                sl[2] = slice(example_idx, example_idx+1) # the axiel slice
+                sl = tuple(sl)
 
-            # plot the underlay
-            ax[j][i].imshow(brain_sl.T, cmap="gist_gray", vmin=0., vmax=1.)
+                # plot the underlay
+                img_sl = img[sl].squeeze()
+                ax[j][i].imshow(img_sl.T, cmap="gist_gray", vmin=0., vmax=1.)
 
-            # plot tumor contours
-            for contour in tumor1_contours:
-                ax[j][i].plot(contour[:, 0], contour[:, 1], color='yellow', linewidth=1.1)
-            for contour in tumor2_contours:
-                ax[j][i].plot(contour[:, 0], contour[:, 1], color=(0.2,1.,0.2,1.), linewidth=1.2)
-            
-            # plot simulated tumor density
-            u_sl = np.ma.masked_where(u_sl < 1e-4, u_sl)
-            rgba_u = np.zeros((u_sl.T.shape[0], u_sl.T.shape[1], 4))
-            rgba_u[..., 0] = 1.0  # red
-            rgba_u[..., 3] = np.sqrt(u_sl.T) * 0.3  # transparency 
-            ax[j][i].imshow(rgba_u, vmin=0., vmax=1.)
+                for k, tumor in enumerate(tumors):
+                    tumor_sl = tumor[sl].squeeze()
 
-            # plot thresholded contour
-            u_contours = measure.find_contours(u_sl, level=0.5)
-            for contour in u_contours:
-                ax[j][i].plot(contour[:, 0], contour[:, 1], color='red', linewidth=1.1)
+                    # get contour of the tumor
+                    tumor_contours = measure.find_contours(tumor_sl, level=0.5)
 
-            ax[j][i].invert_yaxis()  # invert y-axis to match image coordinate system (origin at top-left)
-            ax[j][i].set_title(f"Slice {slice_fracs[j][i]}")
+                    # plot tumor contours
+                    for contour in tumor_contours:
+                        ax[j][i].plot(contour[:, 0], contour[:, 1],
+                                      color=tumor_colors[k], linewidth=1.1)
+                
+                # plot simulated tumor density
+                u_sl = u[sl].squeeze()
+                u_sl = np.ma.masked_where(u_sl < 1e-4, u_sl)
+                rgba_u = np.zeros((u_sl.T.shape[0], u_sl.T.shape[1], 4))
+                rgba_u[..., 0] = 1.0  # red
+                rgba_u[..., 3] = np.sqrt(u_sl.T) * 0.3  # transparency 
+                ax[j][i].imshow(rgba_u, vmin=0., vmax=1.)
 
-    # Add a main title to all plots
-    fig.suptitle(f"{main_title} {time_info}", fontsize=20)
+                # plot thresholded contour
+                u_contours = measure.find_contours(u_sl, level=0.5)
+                for contour in u_contours:
+                    ax[j][i].plot(contour[:, 0], contour[:, 1], color='red', linewidth=1.1)
 
-    # Adjust layout to make room for the main title
-    fig.tight_layout(rect=(0., 0., 1., 0.95))
+                ax[j][i].invert_yaxis()  # invert y-axis to match image coordinate system (origin at top-left)
+                ax[j][i].set_title(f"Slice {slice_fracs[j][i]}")
 
-    if save_dir is not None:
-        fig.savefig(f"{save_dir}/{file_prefix}-i{idx}.jpg")
+        # Add a main title to all plots
+        fig.suptitle(f"{main_title} {time_info}", fontsize=20)
 
-    if show:
-        plt.show()
+        # Adjust layout to make room for the main title
+        fig.tight_layout(rect=(0., 0., 1., 0.95))
 
-    plt.close(fig)
+        if save_dir is not None:
+            fig.savefig(f"{save_dir}/{fpre}-i{idx}.jpg")
+
+        if show:
+            plt.show()
+
+        plt.close(fig)
 
 
 def visualize_model_fit(
-        u: TensorLike, idx: int, t: float, brain: NDArray, tumor1: NDArray, tumor2: NDArray,
-        figsize: Tuple[float, float] = (5, 5), show: bool = True, main_title: str = "Patient",
-        file_prefix: str = "", save_dir: Optional[str] = None):
+        u: TensorLike, idx: int, t: float,
+        underlays: NDArray | List[NDArray], tumors: NDArray | List[NDArray],
+        figsize: Tuple[float, float] = (5, 5), show: bool = True,
+        main_title: str = "Patient",
+        file_prefix: str | List[str] = "",
+        save_dir: Optional[str] = None):
 
     if isinstance(u, Tensor):
         u = u.detach().cpu().numpy()
     u = np.asarray(u)
-
-    brain = 0.8 * brain / brain.max()
+    if not isinstance(underlays, list):
+        underlays = [underlays]
+    if not isinstance(tumors, list):
+        tumors = [tumors]
+    if not isinstance(file_prefix, list):
+        file_prefix = [file_prefix]
+    if len(underlays) > 1 and len(file_prefix) == 1:
+        file_prefix = [str(file_prefix) + str(i+1) for i in range(len(underlays))]
+    elif len(underlays) != len(file_prefix):
+        raise ValueError("Number of underlays mush match the number of file name prefixs.")
+    
     time_info = f"t={round(t, 3)}"
 
-    _vis_brain_scan(u, brain, tumor1, tumor2, figsize, main_title, time_info,
+    _vis_brain_scan(u, underlays, tumors, figsize, main_title, time_info,
                     show=show, file_prefix=file_prefix, save_dir=save_dir, idx=idx)
 
 
 def visualize_model_fit_multiscan(
-        u: TensorLike, idx: int, t: float, brain: NDArray, tumor1: NDArray, tumor2: NDArray,
+        u: TensorLike, idx: int, t: float,
+        underlays: NDArray | List[NDArray], tumors: NDArray | List[NDArray],
         t_scan: List[float], real_t_diff: Optional[float] = None, time_unit: str = "day",
         figsize: Tuple[float, float] = (5, 5), show: bool = True, main_title: str = "Patient",
-        file_prefix: str = "", save_dir: Optional[str] = None):
+        file_prefix: str | List[str] = "",
+        save_dir: Optional[str] = None):
 
     if isinstance(u, Tensor):
         u = u.detach().cpu().numpy()
     u = np.asarray(u)
+    if not isinstance(underlays, list):
+        underlays = [underlays]
+    if not isinstance(tumors, list):
+        tumors = [tumors]
+    if not isinstance(file_prefix, list):
+        file_prefix = [file_prefix]
+    if len(underlays) > 1 and len(file_prefix) == 1:
+        file_prefix = [str(file_prefix) + str(i+1) for i in range(len(underlays))]
+    elif len(underlays) != len(file_prefix):
+        raise ValueError("Number of underlays mush match the number of file name prefixs.")
 
     if real_t_diff is None:
         time_unit = ""
@@ -304,82 +333,9 @@ def visualize_model_fit_multiscan(
     if time_unit == "day":
         ndigits = 1
 
-    brain = 0.8 * brain / brain.max()
-
     time_info = f"t={round(t * time_scale, ndigits)} {time_unit}; " + \
                 f"t-t1={round((t - t_scan[0]) * time_scale, ndigits)} {time_unit}; " + \
                 f"t-t2={round((t - t_scan[1]) * time_scale, ndigits)} {time_unit}"
 
-    _vis_brain_scan(u, brain, tumor1, tumor2, figsize, main_title, time_info,
-                    show=show, file_prefix=file_prefix, save_dir=save_dir, idx=idx)
-
-
-def _vis_brain_scan_2d(
-        u: NDArray, brain: NDArray,
-        tumor1: NDArray, tumor2: NDArray,
-        figsize: Tuple[float, float],
-        main_title: str, time_info: str = "",
-        show: bool = True, file_prefix: str = "",
-        save_dir: Optional[str] = None, idx: int = 0):
-    
-    # tumor1, tumor2 need to be binarized tumor
-    nrow = 1
-    ncol = 1
-    fig, ax = plt.subplots(nrows=nrow, ncols=ncol, figsize=(figsize[0], figsize[1]))
-
-    # get contour of the tumor
-    tumor1_contours = measure.find_contours(tumor1, level=0.5)
-    tumor2_contours = measure.find_contours(tumor2, level=0.5)
-
-    # plot the underlay
-    ax.imshow(brain.T, cmap="gist_gray", vmin=0., vmax=1.)
-
-    # plot tumor contours
-    for contour in tumor1_contours:
-        ax.plot(contour[:, 0], contour[:, 1], color='yellow', linewidth=1.1)
-    for contour in tumor2_contours:
-        ax.plot(contour[:, 0], contour[:, 1], color=(0.2,1.,0.2,1.), linewidth=1.2)
-    
-    # plot simulated tumor density
-    u = np.ma.masked_where(u < 1e-4, u)
-    rgba_u = np.zeros((u.T.shape[0], u.T.shape[1], 4))
-    rgba_u[..., 0] = 1.0  # red
-    rgba_u[..., 3] = np.sqrt(u.T) * 0.3  # transparency 
-    ax.imshow(rgba_u, vmin=0., vmax=1.)
-
-    # plot thresholded contour
-    u_contours = measure.find_contours(u, level=0.5)
-    for contour in u_contours:
-        ax.plot(contour[:, 0], contour[:, 1], color='red', linewidth=1.1)
-
-    ax.invert_yaxis()  # invert y-axis to match image coordinate system (origin at top-left)
-
-    # Add a main title to all plots
-    fig.suptitle(f"{main_title} {time_info}", fontsize=20)
-
-    # Adjust layout to make room for the main title
-    fig.tight_layout(rect=(0., 0., 1., 0.95))
-
-    if save_dir is not None:
-        fig.savefig(f"{save_dir}/{file_prefix}-i{idx}.jpg")
-
-    if show:
-        plt.show()
-
-    plt.close(fig)
-
-
-def visualize_model_fit_2d(
-        u: TensorLike, idx: int, t: float, brain: NDArray, tumor1: NDArray, tumor2: NDArray,
-        figsize: Tuple[float, float] = (5, 5), show: bool = True, main_title: str = "Patient",
-        file_prefix: str = "", save_dir: Optional[str] = None):
-
-    if isinstance(u, Tensor):
-        u = u.detach().cpu().numpy()
-    u = np.asarray(u)
-
-    brain = 0.8 * brain / brain.max()
-    time_info = f"t={round(t, 3)}"
-
-    _vis_brain_scan_2d(u, brain, tumor1, tumor2, figsize, main_title, time_info,
+    _vis_brain_scan(u, underlays, tumors, figsize, main_title, time_info,
                     show=show, file_prefix=file_prefix, save_dir=save_dir, idx=idx)

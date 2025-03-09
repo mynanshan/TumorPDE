@@ -31,6 +31,6 @@ while IFS=',' read -r name date1 date2 date3 datatype batchid numscan; do
     # Submit the job using sbatch with patient and scan_id as arguments
     echo "Run model fitting for patient:" "$name"
     # sbatch patient-fd-inverse.py -p "$name" -i 2,3 -t 1 -s 0 -m 0 -f 1 -r 3
-    sbatch --gpus-per-node=1 patient-fd-forward.py -p "$name" -i 2,3 -s 0 -m 0 -f 1 -r 2
+    sbatch --gpus-per-node=1 patient-fd-inverse.py -p "$name" -i 1,2 -t 0 -s 0 -m 1 -f 0 -r 1
 
 done < "$metainfo"

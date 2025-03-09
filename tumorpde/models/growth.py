@@ -6,6 +6,7 @@ from torch import Tensor
 from torch.nn import Parameter
 from scipy.optimize import minimize
 from tqdm import tqdm
+import nibabel as nib
 
 from tumorpde._typing import TensorLikeFloat, NDArrayLikeFloat, FloatLike
 from tumorpde.volume_domain import VolumeDomain
@@ -133,7 +134,11 @@ class TumorInfiltraFD(TumorFixedFieldBase):
               init_params: Optional[TensorLikeFloat] = None,
               verbose: bool = True, save_all: bool = False,
               plot_func: Optional[Callable] = None,
-              plot_period: int = 10, plot_args: Optional[dict] = None
+              plot_period: int = 10,
+              plot_args: Optional[dict] = None,
+              save_period: int = 50,
+              save_dir: Optional[str] = None,
+              save_args: Optional[dict] = None
         ) -> Tuple[Tensor, Tensor, Tensor]:
 
         # settings
@@ -164,6 +169,9 @@ class TumorInfiltraFD(TumorFixedFieldBase):
         if plot_args is None:
             plot_args = {}
         assert isinstance(plot_args, dict)
+        if save_args is None:
+            save_args = {}
+        assert isinstance(save_args, dict)
 
         # finite difference forward
         ti = t0
@@ -179,6 +187,11 @@ class TumorInfiltraFD(TumorFixedFieldBase):
             if plot_func is not None and i % plot_period == 0:
                 curr_t = round(ti, ndigits=4)
                 plot_func(u, i, curr_t, **plot_args)
+
+            if save_dir is not None and i % save_period == 0:
+                nifti_data = nib.Nifti1Image(
+                    u.detach().cpu().numpy(), save_args['affine'], save_args['header'])
+                nib.save(nifti_data, f"{save_dir}/{save_args['patient']}-i{i}.nii.gz")
 
         return u, torch.linspace(t0, t1, nt), u_hist
 

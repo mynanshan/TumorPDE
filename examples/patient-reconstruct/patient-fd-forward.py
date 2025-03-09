@@ -1,4 +1,3 @@
-
 #!/project/6006512/muye/env/torch/bin/python
 #SBATCH --job-name=fd-forward
 #SBATCH --account=def-jiguocao
@@ -94,8 +93,6 @@ parser.add_argument('-f', '--fixed_init', type=int, choices=[0, 1], default=0,
                     required=False, help='Whether to run the fix-init calibration')
 parser.add_argument('-r', '--ref_scan', type=int, default=1,
                     required=False, help='Which scan is used as the ref_scan')
-parser.add_argument('-u', '--underlay', type=int, choices=[1, 2], default=1,
-                    required=False, help='Which image is used as the underlay. 1: original scan, 2: diffusion field.')
 args = parser.parse_args()
 
 patient = args.patient
@@ -110,7 +107,7 @@ indexes = list(map(int, args.index.split(',')))
 print(f"Modelling Patient: {patient}. Scan indexes {indexes}.")
 print(datetime.today())
 
-data = read_patient_data(patient, test=args.test, mask_ids=indexes, ref=args.ref_scan)
+data = read_patient_data(patient, test=False, mask_ids=indexes, ref=args.ref_scan)
 
 data_path = data["dir_path"]
 # brain = data["brain"]
@@ -119,6 +116,8 @@ gm = data["gm"]
 wm = data["wm"]
 csf = data["csf"]
 tumor_list = data["tumor"]
+aff_info = data["aff_info"]
+header = data["header"]
 del data
 
 if (len(tumor_list) <= 1):
@@ -155,7 +154,7 @@ t0, t1 = 0., 1.
 ## ------------------------------------------------------------
 
 # read parameters
-params_records = pd.read_csv("results/parameters.txt")
+params_records = pd.read_csv("results/parameters.txt", sep="\t")
 first_record = params_records[params_records['Patient'] == patient].iloc[0]
 
 # set up parameters
@@ -164,6 +163,13 @@ D = first_record['D']
 
 # method = "Nelder-Mead"
 method = "L-BFGS-B"
+basic_plot_args = {
+            "file_prefix": [patient, patient+"_vfield"],
+            "underlays": [brain_raw, vox],
+            "tumors": tumor_list,
+            "show": False, "main_title": patient
+            }
+save_args = {'affine': aff_info, 'header': header, 'patient': patient}
 
 
 if args.single_scan == 1:
@@ -186,13 +192,18 @@ if args.single_scan == 1:
     plot_dir = os.path.join(res_path, "plots", patient)
     os.makedirs(plot_dir, exist_ok=True)
 
+    plot_args = basic_plot_args.copy()
+    plot_args['save_dir'] = plot_dir
+
+    save_dir = os.path.join(res_path, "simulation", patient)
+    os.makedirs(save_dir, exist_ok=True)
+
     u, _, _ = fd_pde.solve(
         dt=0.001, t1=1.2 * t1, D=D, rho=rho, init_params=cx,
         plot_func=visualize_model_fit, plot_period=50,
-        plot_args = {'save_dir': plot_dir, 'file_prefix': patient,
-                    "brain": brain_raw, "tumor1": tumor_list[0], "tumor2": tumor_list[-1],
-                    "show": False, "main_title": patient},
-        save_all=False)
+        plot_args = plot_args,
+        save_all=False, save_dir=save_dir,
+        save_period=500, save_args=save_args)
 
 if args.multi_scan == 1:
 
@@ -253,15 +264,21 @@ if args.multi_scan == 1:
     plot_dir = os.path.join(res_path, "plots_multiscan", patient)
     os.makedirs(plot_dir, exist_ok=True)
 
+    plot_args = basic_plot_args.copy()
+    plot_args['save_dir'] = plot_dir
+    plot_args["t_scan"] =  [t1, 1.]
+    plot_args["real_t_diff"] = date_difference
+    plot_args["time_unit"] = "day"
+
+    save_dir = os.path.join(res_path, "simulation_multiscan", patient)
+    os.makedirs(save_dir, exist_ok=True)
+
     u, _, _ = fd_pde.solve(
         dt=0.001, t1=1.2*t1, D=D, rho=rho, init_params=cx,
         plot_func=visualize_model_fit_multiscan, plot_period=50,
-        plot_args = {'save_dir': plot_dir, 'file_prefix': patient,
-                    "brain": brain_raw, "tumor1": tumor_list[0], "tumor2": tumor_list[-1],
-                    "t_scan": [t1, 1.], "real_t_diff": date_difference,
-                    "time_unit": "day", "show": False,
-                    "main_title": patient},
-        save_all=False)
+        plot_args = plot_args,
+        save_all=False, save_dir=save_dir,
+        save_period=500, save_args=save_args)
 
 
 if args.fixed_init == 1:
@@ -281,17 +298,15 @@ if args.fixed_init == 1:
     plot_dir = os.path.join(res_path, "plots_fixinit", patient)
     os.makedirs(plot_dir, exist_ok=True)
 
-    if args.underlay == 1:
-        underlay = brain_raw
-    elif args.underlay == 2:
-        underlay = vox
-    else:
-        raise ValueError("Unknown underlay code.")
+    plot_args = basic_plot_args.copy()
+    plot_args['save_dir'] = plot_dir
+
+    save_dir = os.path.join(res_path, "simulation_fixinit", patient)
+    os.makedirs(save_dir, exist_ok=True)
 
     u, _, _ = fd_pde.solve(
         dt=0.001, t1=1.2 * t1, D=D, rho=rho,
         plot_func=visualize_model_fit, plot_period=50,
-        plot_args = {'save_dir': plot_dir, 'file_prefix': patient,
-                    "brain": underlay, "tumor1": tumor_list[0], "tumor2": tumor_list[-1],
-                    "show": False, "main_title": patient},
-        save_all=False)
+        plot_args = plot_args,
+        save_all=False, save_dir=save_dir,
+        save_period=500, save_args=save_args)

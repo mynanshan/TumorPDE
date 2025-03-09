@@ -117,6 +117,8 @@ gm = data["gm"]
 wm = data["wm"]
 csf = data["csf"]
 tumor_list = data["tumor"]
+aff_info = data["aff_info"]
+header = data["header"]
 del data
 
 if (len(tumor_list) <= 1):
@@ -177,7 +179,13 @@ fd_pde = TumorInfiltraFD(
 
 # method = "Nelder-Mead"
 method = "L-BFGS-B"
-
+basic_plot_args = {
+            "file_prefix": [patient, patient+"_vfield"],
+            "underlays": [brain_raw, vox],
+            "tumors": tumor_list,
+            "show": False, "main_title": patient
+            }
+save_args = {'affine': aff_info, 'header': header, 'patient': patient}
 
 if args.single_scan == 1:
 
@@ -203,13 +211,19 @@ if args.single_scan == 1:
     plot_dir = os.path.join(res_path, "plots", patient)
     os.makedirs(plot_dir, exist_ok=True)
 
+    plot_args = basic_plot_args.copy()
+    plot_args['save_dir'] = plot_dir
+
+    save_dir = os.path.join(res_path, "simulation", patient)
+    os.makedirs(save_dir, exist_ok=True)
+
     u, _, _ = fd_pde.solve(
-        dt=0.001, t1=1.5 * t1, D=result['D'], rho=result['rho'], init_params=result['init_params'],
+        dt=0.001, t1=1.2 * t1,
+        D=result['D'], rho=result['rho'], init_params=result['init_params'],
         plot_func=visualize_model_fit, plot_period=50,
-        plot_args = {'save_dir': plot_dir, 'file_prefix': patient,
-                    "brain": brain_raw, "tumor1": tumor_list[0], "tumor2": tumor_list[-1],
-                    "show": False, "main_title": patient},
-        save_all=False)
+        plot_args = plot_args,
+        save_all=False, save_dir=save_dir,
+        save_period=500, save_args=save_args)
 
     append_parameters_to_file(
         paramfile_path, patient, "single scan",
@@ -263,8 +277,8 @@ if args.multi_scan == 1:
 
     if patient_scan_dates:
         # Convert the scan dates to datetime objects
-        scan_date1 = datetime.strptime(patient_scan_dates[0], "%Y%m%d").date()
-        scan_date2 = datetime.strptime(patient_scan_dates[-1], "%Y%m%d").date()
+        scan_date1 = patient_scan_dates[0].date()
+        scan_date2 = patient_scan_dates[-1].date()
 
         # Calculate the difference between the two dates
         date_difference = float((scan_date2 - scan_date1).days)
@@ -279,15 +293,21 @@ if args.multi_scan == 1:
     plot_dir = os.path.join(res_path, "plots_multiscan", patient)
     os.makedirs(plot_dir, exist_ok=True)
 
+    plot_args = basic_plot_args.copy()
+    plot_args['save_dir'] = plot_dir
+    plot_args["t_scan"] = result['t_scan']
+    plot_args["real_t_diff"] = date_difference
+    plot_args["time_unit"] = "day"
+
+    save_dir = os.path.join(res_path, "simulation_multiscan", patient)
+    os.makedirs(save_dir, exist_ok=True)
+
     u, _, _ = fd_pde.solve(
         dt=0.001, t1=1.5*t1, D=result['D'], rho=result['rho'], init_params=result['init_params'],
         plot_func=visualize_model_fit_multiscan, plot_period=50,
-        plot_args = {'save_dir': plot_dir, 'file_prefix': patient,
-                    "brain": brain_raw, "tumor1": tumor_list[0], "tumor2": tumor_list[-1],
-                    "t_scan": result['t_scan'], "real_t_diff": date_difference,
-                    "time_unit": "day", "show": False,
-                    "main_title": patient},
-        save_all=False)
+        plot_args = plot_args,
+        save_all=False, save_dir=save_dir,
+        save_period=500, save_args=save_args)
 
     append_parameters_to_file(
         paramfile_path, patient, "multi scan",
@@ -329,13 +349,18 @@ if args.fixed_init == 1:
     plot_dir = os.path.join(res_path, "plots_fixinit", patient)
     os.makedirs(plot_dir, exist_ok=True)
 
+    plot_args = basic_plot_args.copy()
+    plot_args['save_dir'] = plot_dir
+
+    save_dir = os.path.join(res_path, "simulation_fixinit", patient)
+    os.makedirs(save_dir, exist_ok=True)
+
     u, _, _ = fd_pde.solve(
-        dt=0.001, t1=1.5 * t1, D=result['D'], rho=result['rho'],
+        dt=0.001, t1=1.2 * t1, D=result['D'], rho=result['rho'],
         plot_func=visualize_model_fit, plot_period=50,
-        plot_args = {'save_dir': plot_dir, 'file_prefix': patient,
-                    "brain": brain_raw, "tumor1": tumor_list[0], "tumor2": tumor_list[-1],
-                    "show": False, "main_title": patient},
-        save_all=False)
+        plot_args = plot_args,
+        save_all=False, save_dir=save_dir,
+        save_period=500, save_args=save_args)
 
     append_parameters_to_file(
         paramfile_path, patient, "fixed init",
