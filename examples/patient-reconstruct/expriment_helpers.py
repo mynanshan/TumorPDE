@@ -30,7 +30,7 @@ def read_patient_data(patient: str, test: bool = False, mask_ids: List[int] = [1
     if test:
         zoom_factors = 0.05
     else:
-        zoom_factors = 0.5
+        zoom_factors = 1.
 
     dir_path = "../data/PatienTumorMultiScan2024/"
     brain, aff_info, header = ndarray_from_nifty(os.path.join(

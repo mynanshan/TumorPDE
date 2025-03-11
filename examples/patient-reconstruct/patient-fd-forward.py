@@ -67,7 +67,6 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 torch.set_default_device(device)
 print(f"The current device is: {device}")
 
-import json
 from datetime import datetime
 import pandas as pd
 
