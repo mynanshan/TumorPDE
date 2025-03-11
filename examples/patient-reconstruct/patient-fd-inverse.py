@@ -320,7 +320,7 @@ if args.fixed_init == 1:
     def init_density_func(x, rmax = 0.1):
         return rmax * torch.as_tensor(tumor_list[0], device=device)
 
-    init_density_params = {"rmax": 0.1}
+    init_density_params = {"rmax": 0.3}
 
     fd_pde = TumorInfiltraFD(
         geom, D, rho,

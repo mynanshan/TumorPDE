@@ -136,64 +136,6 @@ def append_parameters_to_file(file_path, patient, experiment_type, D, rho, x0, t
         writer = csv.writer(f, delimiter='\t')
         writer.writerows(existing_rows)
 
-# def _vis_brain_scan(
-#         u: TensorLike, brain: NDArray,
-#         tumor1: NDArray, tumor2: NDArray,
-#         figsize: Tuple[float, float],
-#         main_title: str, time_info: str = "",
-#         show: bool = True, file_prefix: str = "",
-#         save_dir: Optional[str] = None, idx: int = 0):
-
-#     nrow = 4
-#     ncol = 4
-#     fig, ax = plt.subplots(nrows=nrow, ncols=ncol,
-#                            figsize=(figsize[0]*nrow, figsize[1]*ncol))
-
-#     slice_fracs = np.linspace(0.2, 0.8, nrow * ncol).reshape((nrow,ncol))
-
-#     for j in range(ncol):
-#         for i in range(nrow):
-
-#             example_idx = int(brain.shape[2] * slice_fracs[j][i])
-#             sl = [slice(None)] * 3
-#             sl[2] = slice(example_idx, example_idx+1) # the axiel slice
-#             sl = tuple(sl)
-#             ax[j][i].imshow(brain[sl].squeeze().T, cmap="gist_gray", vmin=0., vmax=1.)
-#             masked_tumor = np.ma.masked_where(
-#                 tumor1[sl].squeeze() < 0.5, tumor1[sl].squeeze())
-#             ax[j][i].imshow(masked_tumor.T, cmap='Reds', alpha=0.3, vmin=0., vmax=1.)
-#             masked_tumor = np.ma.masked_where(
-#                 np.logical_or(tumor2[sl].squeeze() < 0.5,
-#                                tumor1[sl].squeeze() >= 0.5),
-#                 tumor2[sl].squeeze())
-#             ax[j][i].imshow(masked_tumor.T, cmap='viridis',
-#                             alpha=0.3, vmin=0., vmax=1.)
-#             masked_u = np.ma.masked_where(
-#                 u[sl].squeeze() < 1e-1, u[sl].squeeze())
-#             norm_u = (masked_u - masked_u.min()) / (masked_u.max() -
-#                                                     masked_u.min())  # Normalize to 0-1 range
-#             alpha_channel = np.minimum(norm_u, 0.6)
-#             cmap = plt.get_cmap("Blues_r")
-#             rgba_u = cmap(masked_u)  # Apply the colormap
-#             rgba_u[..., -1] = alpha_channel  # Set the custom alpha channel
-#             ax[j][i].imshow(rgba_u.T, alpha=0.9, vmin=0., vmax=1.)
-#             ax[j][i].invert_yaxis()  # invert y-axis to match image coordinate system (origin at top-left)
-#             ax[j][i].set_title(f"Slice {slice_fracs[j][i]}")
-
-#     # Add a main title to all plots
-#     fig.suptitle(f"{main_title} {time_info}", fontsize=20)
-
-#     # Adjust layout to make room for the main title
-#     fig.tight_layout(rect=(0., 0., 1., 0.95))
-
-#     if save_dir is not None:
-#         fig.savefig(f"{save_dir}/{file_prefix}-i{idx}.jpg")
-
-#     if show:
-#         plt.show()
-
-#     plt.close(fig)
-
 
 def _vis_brain_scan(
         u: NDArray,
@@ -252,7 +194,7 @@ def _vis_brain_scan(
                 ax[j][i].imshow(rgba_u, vmin=0., vmax=1.)
 
                 # plot thresholded contour
-                u_contours = measure.find_contours(u_sl, level=0.5)
+                u_contours = measure.find_contours(u_sl, level=0.3)
                 for contour in u_contours:
                     ax[j][i].plot(contour[:, 0], contour[:, 1], color='red', linewidth=1.1)
 
