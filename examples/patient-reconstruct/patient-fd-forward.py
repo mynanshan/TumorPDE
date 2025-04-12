@@ -157,7 +157,7 @@ params_records = pd.read_csv("results/parameters.txt", sep="\t")
 first_record = params_records[params_records['Patient'] == patient].iloc[0]
 
 # set up parameters
-rho = first_record['rho']
+alpha = first_record['alpha']
 D = first_record['D']
 
 # method = "Nelder-Mead"
@@ -183,7 +183,7 @@ if args.single_scan == 1:
     max_iter = 200
 
     fd_pde = TumorInfiltraFD(
-        geom, D, rho, init_learnable_params=cx,
+        geom, D, alpha, init_learnable_params=cx,
         init_other_params=init_density_params, device=device)
 
     print("Start plotting")
@@ -198,7 +198,7 @@ if args.single_scan == 1:
     os.makedirs(save_dir, exist_ok=True)
 
     u, _, _ = fd_pde.solve(
-        dt=0.001, t1=1.2 * t1, D=D, rho=rho, init_params=cx,
+        dt=0.001, t1=1.2 * t1, D=D, alpha=alpha, init_params=cx,
         plot_func=visualize_model_fit, plot_period=50,
         plot_args = plot_args,
         save_all=False, save_dir=save_dir,
@@ -217,7 +217,7 @@ if args.multi_scan == 1:
     max_iter = 200
 
     fd_pde = TumorInfiltraFD(
-        geom, D, rho, init_learnable_params=cx,
+        geom, D, alpha, init_learnable_params=cx,
         init_other_params=init_density_params, device=device)
 
     # Read the data into a pandas DataFrame
@@ -273,7 +273,7 @@ if args.multi_scan == 1:
     os.makedirs(save_dir, exist_ok=True)
 
     u, _, _ = fd_pde.solve(
-        dt=0.001, t1=1.2*t1, D=D, rho=rho, init_params=cx,
+        dt=0.001, t1=1.2*t1, D=D, alpha=alpha, init_params=cx,
         plot_func=visualize_model_fit_multiscan, plot_period=50,
         plot_args = plot_args,
         save_all=False, save_dir=save_dir,
@@ -288,7 +288,7 @@ if args.fixed_init == 1:
     init_density_params = {"rmax": 0.1}
 
     fd_pde = TumorInfiltraFD(
-        geom, D, rho,
+        geom, D, alpha,
         init_density_func=init_density_func,
         init_other_params=init_density_params, device=device)
 
@@ -304,7 +304,7 @@ if args.fixed_init == 1:
     os.makedirs(save_dir, exist_ok=True)
 
     u, _, _ = fd_pde.solve(
-        dt=0.001, t1=1.2 * t1, D=D, rho=rho,
+        dt=0.001, t1=1.2 * t1, D=D, alpha=alpha,
         plot_func=visualize_model_fit, plot_period=50,
         plot_args = plot_args,
         save_all=False, save_dir=save_dir,

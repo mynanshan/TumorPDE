@@ -156,9 +156,9 @@ t0, t1 = 0., 1.
 
 
 # set up parameters
-rho = 20.
+alpha = 20.
 if args.test == 1:
-    rho = 2.
+    alpha = 2.
 D = 100.
 if args.test == 1:
     D = 10.
@@ -174,7 +174,7 @@ if args.test == 1:
     max_iter = 20
 
 fd_pde = TumorInfiltraFD(
-    geom, D, rho, init_learnable_params=cx,
+    geom, D, alpha, init_learnable_params=cx,
     init_other_params=init_density_params, device=device)
 
 # method = "Nelder-Mead"
@@ -201,9 +201,9 @@ if args.single_scan == 1:
 
     print(f"""
     Initial parameters:
-        D = {D}, rho={rho}, x0={cx}
+        D = {D}, alpha={alpha}, x0={cx}
     Calibrated parameters:
-        D = {result['D']}, rho={result['rho']}, x0={result['init_params']}
+        D = {result['D']}, alpha={result['alpha']}, x0={result['init_params']}
     """)
 
     print("Start plotting")
@@ -219,7 +219,7 @@ if args.single_scan == 1:
 
     u, _, _ = fd_pde.solve(
         dt=0.001, t1=1.2 * t1,
-        D=result['D'], rho=result['rho'], init_params=result['init_params'],
+        D=result['D'], alpha=result['alpha'], init_params=result['init_params'],
         plot_func=visualize_model_fit, plot_period=50,
         plot_args = plot_args,
         save_all=False, save_dir=save_dir,
@@ -227,7 +227,7 @@ if args.single_scan == 1:
 
     append_parameters_to_file(
         paramfile_path, patient, "single scan",
-        result['D'].item(), result['rho'].item(), result['init_params'].tolist())
+        result['D'].item(), result['alpha'].item(), result['init_params'].tolist())
 
 if args.multi_scan == 1:
 
@@ -244,9 +244,9 @@ if args.multi_scan == 1:
 
     print(f"""
     Initial parameters:
-        D = {D}, rho={rho}, x0={cx}
+        D = {D}, alpha={alpha}, x0={cx}
     Calibrated parameters:
-        D = {result['D']}, rho={result['rho']}, x0={result['init_params']}
+        D = {result['D']}, alpha={result['alpha']}, x0={result['init_params']}
         t_scan = {result['t_scan']}
     """)
 
@@ -303,7 +303,7 @@ if args.multi_scan == 1:
     os.makedirs(save_dir, exist_ok=True)
 
     u, _, _ = fd_pde.solve(
-        dt=0.001, t1=1.5*t1, D=result['D'], rho=result['rho'], init_params=result['init_params'],
+        dt=0.001, t1=1.5*t1, D=result['D'], alpha=result['alpha'], init_params=result['init_params'],
         plot_func=visualize_model_fit_multiscan, plot_period=50,
         plot_args = plot_args,
         save_all=False, save_dir=save_dir,
@@ -311,7 +311,7 @@ if args.multi_scan == 1:
 
     append_parameters_to_file(
         paramfile_path, patient, "multi scan",
-        result['D'].item(), result['rho'].item(), result['init_params'].tolist(),
+        result['D'].item(), result['alpha'].item(), result['init_params'].tolist(),
         result['t_scan'][0])
 
 
@@ -323,7 +323,7 @@ if args.fixed_init == 1:
     init_density_params = {"rmax": 0.3}
 
     fd_pde = TumorInfiltraFD(
-        geom, D, rho,
+        geom, D, alpha,
         init_density_func=init_density_func,
         init_other_params=init_density_params, device=device)
 
@@ -339,9 +339,9 @@ if args.fixed_init == 1:
 
     print(f"""
     Initial parameters:
-        D = {D}, rho={rho},
+        D = {D}, alpha={alpha},
     Calibrated parameters:
-        D = {result['D']}, rho={result['rho']}
+        D = {result['D']}, alpha={result['alpha']}
     """)
 
     print("Start plotting")
@@ -356,7 +356,7 @@ if args.fixed_init == 1:
     os.makedirs(save_dir, exist_ok=True)
 
     u, _, _ = fd_pde.solve(
-        dt=0.001, t1=1.2 * t1, D=result['D'], rho=result['rho'],
+        dt=0.001, t1=1.2 * t1, D=result['D'], alpha=result['alpha'],
         plot_func=visualize_model_fit, plot_period=50,
         plot_args = plot_args,
         save_all=False, save_dir=save_dir,
@@ -364,4 +364,4 @@ if args.fixed_init == 1:
 
     append_parameters_to_file(
         paramfile_path, patient, "fixed init",
-        result['D'].item(), result['rho'].item(), ["", "", ""])
+        result['D'].item(), result['alpha'].item(), ["", "", ""])

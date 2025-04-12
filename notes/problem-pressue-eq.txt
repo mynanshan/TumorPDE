@@ -1,0 +1,57 @@
+
+Pressure dynamic equation:
+-M \nabla \cdot (\nabla p) + k p = F
+where F = \alpha u (1 - u)
+* M: hydraulic conductivity, assume to be a const across the whole domain
+* p: pressure field
+* kappa: tissue-specific relaxation factor
+
+Pressure dynamic with phase field function \phi:
+-M \nabla \cdot (\phi \nabla p) + \phi \kappa p = \phi F
+
+Discretization: (i,j,k) cell index
+
+(\nabla \cdot (\phi \nabla p))_{i,j,k} \approx \frac{M}{2(\Delta x)^2} [\phi_{i+1/2,j,k} (p_{i+1,j,k} - p_{i,j,k}) + \phi_{i-1/2,j,k} (p_{i-1,j,k} - p_{i,j,k})] + {y terms} + {z terms}
+= M {
+    \frac{1}{(\Delta x)^2} \phi_{i+1/2,j,k} p_{i+1,j,k} + \frac{1}{(\Delta x)^2} \phi_{i-1/2,j,k} p_{i-1,j,k} + 
+    \frac{1}{(\Delta y)^2} \phi_{i,j+1/2,k} p_{i,j+1,k} + \frac{1}{(\Delta y)^2} \phi_{i,j-1/2,k} p_{i,j-1,k} +
+    \frac{1}{(\Delta z)^2} \phi_{i,j,k+1/2} p_{i,j,k+1} + \frac{1}{(\Delta z)^2} \phi_{i,j,k-1/2} p_{i,j,k-1} -
+    [
+        \frac{1}{(\Delta x)^2} \phi_{i+1/2,j,k} + \frac{1}{(\Delta x)^2} \phi_{i-1/2,j,k} +
+        \frac{1}{(\Delta y)^2} \phi_{i,j+1/2,k} + \frac{1}{(\Delta x)^2} \phi_{i,j-1/2,k} +
+        \frac{1}{(\Delta z)^2} \phi_{i,j,k+1/2} + \frac{1}{(\Delta z)^2} \phi_{i,j,k-1/2}
+    ] \phi_{i,j,k}
+}
+\approx M {
+    \frac{1}{(\Delta x)^2} \phi_{i+1/2,j,k} p_{i+1,j,k} + \frac{1}{(\Delta x)^2} \phi_{i-1/2,j,k} p_{i-1,j,k} + 
+    \frac{1}{(\Delta y)^2} \phi_{i,j+1/2,k} p_{i,j+1,k} + \frac{1}{(\Delta y)^2} \phi_{i,j-1/2,k} p_{i,j-1,k} +
+    \frac{1}{(\Delta z)^2} \phi_{i,j,k+1/2} p_{i,j,k+1} + \frac{1}{(\Delta z)^2} \phi_{i,j,k-1/2} p_{i,j,k-1} -
+    2 [\frac{1}{(\Delta x)^2} + \frac{1}{(\Delta y)^2} + \frac{1}{(\Delta z)^2} ] \phi_{i,j,k}
+}
+
+The discretized equation defines a linear system with the discretized p regarded as the unknown vector. Here we list each the equation defined by the (i,j,k)-th element: 
+
+\phi_{i,j,k} [\kappa_{i,j,k} + 2M (\frac{1}{(\Delta x)^2} + \frac{1}{(\Delta y)^2} + \frac{1}{(\Delta z)^2})] - 
+\frac{M}{(\Delta x)^2}\phi_{i+1/2,j,k} p_{i+1,j,k} -
+\frac{M}{(\Delta x)^2}\phi_{i-1/2,j,k} p_{i-1,j,k} -
+\frac{M}{(\Delta y)^2}\phi_{i,j+1/2,k} p_{i,j+1,k} -
+\frac{M}{(\Delta y)^2}\phi_{i,j-1/2,k} p_{i,j-1,k} -
+\frac{M}{(\Delta z)^2}\phi_{i,j,k+1/2} p_{i,j,k+1} -
+\frac{M}{(\Delta z)^2}\phi_{i,j,k-1/2} p_{i,j,k-1} = \phi_{i,j,k} F_{i,j,k} ---------------------------- (*)
+
+Linear system (*) defines the equation for 2<=i<=N_x-1, 2<=j<=N_y-1, 2<=k<=N_z-1. These (N_x-2)(N_y-2)(N_z-2) equations cannot uniquely determine p on N_x N_y N_z points. This is of couse because we haven't include boundary conditions. To my understanding, the Neumann boundary condition can be discretized as
+p_{i,j,k} = p_{i+1,j,k}, i=1,
+p_{i,j,k} = p_{i-1,j,k}, i=N_x,
+p_{i,j,k} = p_{i,j+1,k}, j=1,
+p_{i,j,k} = p_{i,j-1,k}, j=N_y,
+p_{i,j,k} = p_{i,j,k+1}, k=1,
+p_{i,j,k} = p_{i,j,k-1}, k=N_z,
+These equations supplement the rest of the linear system.
+
+Before we proceed, let me delve a little deeper into how the state variables are stored in my program.
+
+Suppose the domain is an (N_x, N_y, N_z) tensor. Then, the tumor density u, brain tissue density rho_s for s \in {gm, wm, csf}, phase field phi, pressue p, diffusion rate D, relaxation factor kappa are all tensors of the same shape. The outer boundary of these tensors, i.e., their values when i\in {1,N_x} or j\in {1,N_y} or k\in {1,N_z} are not only used as the PDE's boundary, but also are important margins left for finite difference calculation.
+For \phi_{i+1/2,j,k}, I compute by
+0.5 * (phi[2:,1:N_y-1,1:N_z-1] + phi[:N_x-2,1:N_y-1,1:N_z-1]), which gives a (N_x-2, N_y-2, N_z-2)-dimensional tensor. Similarly, I did similar computations for \phi_{i,j+1/2,k} and \phi_{i,j,k+1/2} and they all gives the same shape.
+
+Next, we need to "flatten" this linear system from the tensor form to its usual form such that linear solvers can be applied. Due to the multidimensional nature of all states and the boundary conditions which further complicate the structure, how to do the flattening is very challenging. Could you help me with it? Preferably we need to store the linear system coefcient matrix in a sparse format.

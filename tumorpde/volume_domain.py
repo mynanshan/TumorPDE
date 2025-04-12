@@ -9,7 +9,7 @@ class VolumeDomain:
     Define a volume with arbitrary shape. The shape is specificed by a density array
     """
 
-    def __init__(self, voxel, voxel_widths):
+    def __init__(self, voxel, voxel_widths, dtype=np.float32):
         """
         Define a volume with arbitrary shape specified by a density array.
 
@@ -17,6 +17,7 @@ class VolumeDomain:
             voxel: ndarray, voxel data representing the density.
             voxel_widths: sequence of floats, widths of the voxels in each dimension.
         """
+        
         self.voxel = np.asarray(voxel)
         self.dim = self.voxel.ndim
         self.voxel_grad = np.gradient(self.voxel)
