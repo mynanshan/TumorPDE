@@ -177,3 +177,23 @@ def _spec_dt(dt: float, t_span: float,
     t1 = (nt - 1) * dt  # the actual t1
 
     return dt, nt, t1
+
+
+def _neumann_rect(x: Tensor) -> None:
+    """Enforce Neumann boundary condition for a field defined
+    on a rectangular grid."""
+    xdims = x.shape
+    ndim = x.ndim
+    for i in range(ndim):
+        for j in [0, xdims[i] - 1]:
+            # boundary indices
+            bnd_sl = [slice(None, None)] * ndim
+            bnd_sl[i] = slice(j, j+1)
+
+            # neighbour indices
+            k = 1 if j ==0 else xdims[i]-2
+            neb_sl = [slice(None, None)] * ndim
+            neb_sl[i] = slice(k, k+1)
+
+            x[bnd_sl] = x[neb_sl]
+
