@@ -9,7 +9,7 @@ class VolumeDomain:
     Define a volume with arbitrary shape. The shape is specificed by a density array
     """
 
-    def __init__(self, voxel, voxel_widths, dtype=np.float32):
+    def __init__(self, voxel, voxel_widths, dtype: np.dtype = np.dtype(np.float32)):
         """
         Define a volume with arbitrary shape specified by a density array.
 
@@ -18,10 +18,13 @@ class VolumeDomain:
             voxel_widths: sequence of floats, widths of the voxels in each dimension.
         """
         
-        self.voxel = np.asarray(voxel)
+        dtype = np.dtype(dtype)
+        self.dtype = dtype
+
+        self.voxel = np.asarray(voxel, dtype=dtype)
         self.dim = self.voxel.ndim
         self.voxel_grad = np.gradient(self.voxel)
-        self.voxel_widths = np.asarray(voxel_widths)
+        self.voxel_widths = np.asarray(voxel_widths, dtype=dtype)
         self.voxel_volume = np.prod(self.voxel_widths)
         if len(self.voxel_widths) != self.dim:
             raise ValueError("voxel_widths does not match the dimension.")
@@ -29,9 +32,9 @@ class VolumeDomain:
         # self.voxel_grad = np.zeros_like(self.voxel)
         if self.dim == 1:
             self.voxel_grad = [self.voxel_grad]
-        self.xmin = np.array([0.] * self.dim)
+        self.xmin = np.array([0.] * self.dim, dtype=dtype)
         self.xmax = np.array(
-            [w * n for w, n in zip(self.voxel_widths, self.voxel_shape)])
+            [w * n for w, n in zip(self.voxel_widths, self.voxel_shape)], dtype=dtype)
         self.bbox = (self.xmin, self.xmax)
         self.bbox_widths = self.xmax - self.xmin
         self.bbox_volume = np.prod(self.bbox_widths)
@@ -42,12 +45,11 @@ class VolumeDomain:
             l, u, n + 1) for l, u, n in zip(self.xmin, self.xmax, self.voxel_shape))
         self.boundary_voxels = self._get_boundary_locations()
         boundary_indices = np.argwhere(self.boundary_voxels)
-        # self.boundary_anchors = np.hstack(
-        #     [self.voxel_marginal_coords[i][boundary_indices[:, i:i+1]] for i in range(self.dim)])
         self.boundary_anchors = np.column_stack(
             [self.voxel_marginal_coords[i][boundary_indices[:, i]]
                 for i in range(self.dim)]
         )
+        
 
     def _get_voxel_indices(self, x):
         idx = tuple(np.searchsorted(

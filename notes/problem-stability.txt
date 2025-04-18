@@ -1,0 +1,432 @@
+I am implementing Lipkova's tumor-induced brain deformation model in Python based on PyTorch. Let me introduce the main code first:
+```{python}
+    def solve(self, dt: float = 0.001, t1: float = 1.,
+              D: Optional[Tensor] = None, alpha: Optional[Tensor] = None,
+              M: Optional[Tensor] = None, kappa: Optional[Tensor] = None,
+              D_ratio: Optional[Tensor] = None,
+              kappa_ratios: Optional[Tensor] = None,
+              init_params: Optional[Tensor] = None,
+              verbose=True):
+
+        # parameters
+        parameters = self._format_parameters(
+            D, alpha, M, kappa,
+            D_ratio, kappa_ratios,
+            init_params)
+
+        # settings
+        dt0 = float(dt)
+        t1 = float(t1)
+        t0 = 0.
+        assert t1 > t0
+        t_span = t1 - t0
+
+        # initialization
+        state = self.init_state(self._init_params(parameters))
+
+        # forward
+        ti = t0
+        t = [t0]
+        # TODO: adapt dt dynamically
+        while (ti < t1):
+            dt = self._spec_dt(dt, t_span, self.dx.tolist(),
+                               self._D(parameters).item(),
+                               torch.max(torch.abs(state.deform_velocity)).item())
+            if dt < dt0 / 100:
+                dt = dt0 / 100
+                print(
+                    f"Fix dt to {dt0} / 100, but smaller dt may be necessary.")
+            ti += dt
+            t.append(ti)
+
+            self.forward_update(state, dt, parameters)
+
+        return state
+
+    def init_state(self, init_params: Tensor) -> TumorBrainDeformState:
+
+        # initial tumor density
+        u = self.init_density(self.x_mesh, init_params,
+                              **self.init_other_params)
+
+        # initial brain matter densities
+        rho = self.matters.clone()
+
+        # inital relative velocity and pressure field
+        v = torch.zeros((self.dim, *self.nx), **self.factory_args)
+        p = torch.zeros(*self.nx, **self.factory_args)
+
+        return TumorBrainDeformState(self.domain_mask, 0., u, rho,
+                                     v, p, **self.factory_args)
+
+    def forward_update(self,
+                       state: TumorBrainDeformState,
+                       dt: float,
+                       parameters: Tensor | None) -> None:
+        if parameters is not None:
+            parameters = self.parameters
+        self._forward_update(dt,
+                             state.tumor_density,
+                             state.brain_density,
+                             state.brain_proportion,
+                             state.deform_velocity,
+                             state.pressure_field,
+                             self._D(parameters),
+                             self._alpha(parameters),
+                             self._M(parameters),
+                             self._kappa(parameters),
+                             self._D_ratio(parameters),
+                             self._kappa_ratios(parameters))
+
+    def _forward_update(self, dt: float,
+                        u: Tensor, rho: Tensor,
+                        omega: Tensor, v: Tensor, p: Tensor,
+                        D: Tensor, alpha: Tensor,
+                        M: Tensor, kappa: Tensor,
+                        D_ratio: Tensor, kappa_ratios: Tensor,
+                        weno: bool = False) -> None:
+        # TODO: add support for weno
+        # TODO: critical rethinking: is the current model realistic enough?
+
+        # rho: gm, wm, csf
+        # in-place update of u, rho, and p.
+
+        p_sl, m_sl, c_sl = _get_slicing_positions(self.dim)
+
+        # TODO: double check boundary conditions for p, v, u, rho
+
+        # pressure field
+        # the const term F is alpha * u * (1 - u)
+        kappa_field = kappa * (
+            omega[0] * kappa_ratios[0] +   # gm
+            omega[1] * kappa_ratios[1] +   # wm
+            omega[2] * 1.                 # csf
+        )
+        # p[c_sl] = self._pressure_field(
+        #     self.M, kappa_field, self.alpha * u * (1 - u))
+        p[self.domain_mask] = self._pressure_field_interior(
+            self.M, kappa_field, self.alpha * u * (1 - u))
+        p.mul_(self.domain_mask)
+
+        # deformation velocity field
+        for i in range(self.dim):
+            v[i][c_sl] = - M * (p[p_sl[i]] - p[m_sl[i]]) / (2 * self.dx[i])
+            v[i].mul_(self.domain_mask)
+
+        # diffusion rate field and its finite-difference aux
+        diff_field = omega[0] * D_ratio + omega[1]
+        diff_field_aux = _fd_auxiliaries(diff_field)
+
+        # update tumor density
+        nab_d_nab_u = _nabla_d_nabla_f(u, self.idx2, diff_field_aux)
+        du_dt = D * nab_d_nab_u + alpha * u[c_sl] * (1 - u[c_sl]) - \
+            _v_dot_nabla_u(v, u, self.dx)
+        u[c_sl] += dt * du_dt
+        u.mul_(self.domain_mask)
+        self._clip_state(u)
+
+        # update brain tissue density
+        # TODO: change to WENO5 in the future, currently using central differences
+        # TODO: warp advection computation into help functions
+        drho_dt = torch.zeros((3, *self.nx), **self.factory_args)
+        for s in range(3):
+            for i in range(self.dim):
+                drho_dt[s][c_sl] -= \
+                    v[i][c_sl] * (rho[s][p_sl[i]] - rho[s][m_sl[i]]) / (2 * self.dx[i]) + \
+                    rho[s][c_sl] * (v[i][p_sl[i]] - v[i][m_sl[i]]) / (2 * self.dx[i])
+        for s in range(3):
+            rho[s][c_sl] += dt * drho_dt[s][c_sl]
+            # _neumann_rect(rho[s])
+            rho[s].mul_(self.domain_mask)
+            if torch.sum(rho[s] < 0.) > 0:
+                print(f"Negative density at rho[{s}] occured and had been forced to 0.")
+                rho[s][rho[s] < 0.] = 0.
+
+    def _pressure_field_interior(self, M: Tensor, Kappa: Tensor, F: Tensor) -> Tensor:
+
+        # NOTE: this version only solves the pressure field for the interior points
+
+        # p_sl, m_sl: slicing the plus-one/minus-one grids along each dim
+        p_sl, m_sl, _ = _get_slicing_positions(self.dim, no_boundary=False)
+
+        phi = self.phase_field
+        phi_hp = self.phase_aux  # phi on half points
+        sum_idx2 = torch.sum(self.idx2)
+
+        N = self.n_in_points
+        ind_interior = self.interior_indices  # in-domain grid point indexes
+        mask = self.domain_mask
+
+        rows, cols, vals = [], [], []
+
+        # --- Interior Points ---
+        # Diagonal terms: phi*(kappa + 2*M*(1/dx^2 + 1/dy^2 + 1/dz^2))
+        diag = phi * (Kappa + 2 * M * sum_idx2)
+        rows.append(ind_interior[mask].flatten())
+        cols.append(ind_interior[mask].flatten())
+        vals.append(diag[mask].flatten())
+
+        # Off-diagonal terms: -phi_{i+1/2,j,k} M / dx^2, ...
+        for i in range(self.dim):
+            is_p1sl_in_domain = mask[p_sl[i]]
+            is_m1sl_in_domain = mask[m_sl[i]]
+
+            # both minus-1 and plus-1 point are in domain
+            avail_mask = torch.logical_and(
+                is_p1sl_in_domain, is_m1sl_in_domain)
+
+            p_term = ind_interior[m_sl[i]][avail_mask], \
+                ind_interior[p_sl[i]][avail_mask], \
+                - M/self.dx[i]**2 * phi_hp[i][avail_mask]
+            m_term = ind_interior[p_sl[i]][avail_mask], \
+                ind_interior[m_sl[i]][avail_mask], \
+                - M/self.dx[i]**2 * phi_hp[i][avail_mask]
+            for r, c, v in [p_term, m_term]:
+                rows.append(r.flatten())
+                cols.append(c.flatten())
+                vals.append(v.flatten())
+
+        # Concatenate all entries
+        rows = torch.cat(rows)
+        cols = torch.cat(cols)
+        vals = torch.cat(vals)
+
+        # Create sparse matrix
+        A = torch.sparse_coo_tensor(
+            torch.stack([rows, cols]), vals,
+            (N, N), **self.factory_args
+        ).to_sparse_csr()
+
+        # Right-hand side: b = phi * F for interior points
+        b = (phi[mask] * F[mask]).flatten()
+
+        # sparse symmetric linear system by conjugate gradient
+        sol, _ = CG(A, b)
+
+        return sol.to(**self.factory_args)
+```
+The code displays several main methods defined for my class TumorDeformFD. The forward_update method is responsible for one-step forward simulation. Note that notations are slightly different in my code:
+- Reaction rate in tumor dynamics: alpha (me) vs. rho (Lipkova)
+- Brain tissue densities: rho_s (me) vs. omega_s (Lipkova)
+- Brain tissue proportions: omega_s (me) vs. p_s (Lipkova)
+
+The code should support the PDE model defined on any-dimensional domains. I specifically did a simulation study on a one-dimensional domain with gm, wm and csf mannually specified. Pls see the code for the brain tissue generation:
+```{python}
+# define the grid of the spatial domain 
+dx = 0.1
+x_range = (0., 10.)
+nx = int((x_range[1] - x_range[0]) / dx + 1)
+x_grid = np.linspace(x_range[0], x_range[1], nx)
+
+# define a domain mask
+domain_interval = np.logical_and(x_grid >= 1., x_grid <= 9.)
+domain_mask = np.zeros_like(x_grid) + 1. * domain_interval
+fake_gm = np.zeros_like(x_grid) + \
+    (0.2 + np.sin(np.pi * (x_grid - 2.))) * np.logical_and(x_grid >= 2., x_grid <= 3.) + \
+    (0.2 + np.sin(np.pi * (x_grid - 7.))) * np.logical_and(x_grid >= 7., x_grid <= 8.) + \
+    (0.1 + np.sin(2 * np.pi * (x_grid - 3.5))) * np.logical_and(x_grid >= 3.5, x_grid <= 4.) + \
+    (0.1 + np.sin(2 * np.pi * (x_grid - 6.))) * np.logical_and(x_grid >= 6., x_grid <= 6.5)
+fake_wm = np.zeros_like(x_grid) + \
+    (0.1 + np.sin(np.pi * (x_grid - 2.5) / 2.)) * np.logical_and(x_grid >= 2.5, x_grid <= 4.5) + \
+    (0.1 + np.sin(np.pi * (x_grid - 5.5) / 2.)) * np.logical_and(x_grid >= 5.5, x_grid <= 7.5)
+fake_csf = np.zeros_like(x_grid) + \
+    (0.05 + 0.1 * np.sin(np.pi * (x_grid - 4.) / 2)) * np.logical_and(x_grid >= 4., x_grid <= 6.) + \
+    (0.05 + 0.1 * np.sin(np.pi * (x_grid - 1.) / 2)) * np.logical_and(x_grid >= 1., x_grid <= 3.) + \
+    (0.05 + 0.1 * np.sin(np.pi * (x_grid - 7.) / 2)) * np.logical_and(x_grid >= 7., x_grid <= 9.)
+```
+To summarize, I set the entire domain as [0,10], brain tissues as positive sinusoidal peaks that fill the range [1,9]. 
+
+My problem is: I found that the forward computation is not stable. After some time, the brain tissue density (the csf density in this specific simulation) appears to oscillate at the boundary, and the oscillation gradually propogates to the entire domain, which will finally make the calculation crash. I hope you can inspect my detailed calculation, and provide me with suggestions on how to improve the numerical stability.
+
+Start from here are the detailed code breakdowns:
+
+Tumor dynamics:
+```
+# diffusion rate field and its finite-difference aux
+diff_field = omega[0] * D_ratio + omega[1]
+diff_field_aux = _fd_auxiliaries(diff_field)
+
+nab_d_nab_u = _nabla_d_nabla_f(u, self.idx2, diff_field_aux)
+du_dt = D * nab_d_nab_u + alpha * u[c_sl] * (1 - u[c_sl]) - \
+    _v_dot_nabla_u(v, u, self.dx)
+u[c_sl] += dt * du_dt
+u.mul_(self.domain_mask)
+self._clip_state(u)
+```
+`diff_field` is the diffusion rate. `diff_field_aux` is basically the numerical approximation of the diffussion rate on half-grid points, which is required in the numerical approximation in the diffusion term.
+Here's the definition of `_fd_auxiliaries` and `_nabla_d_nabla_f` :
+```
+def _fd_auxiliaries(d: Tensor) -> Tuple[List[Tensor], List[Tensor]]:
+    r"""
+    Auxiliaries for numerical approximation of the diffusion term on a grid
+    Input: d(x), diffusivity field on the grid, shape (n_1, ..., n_d)
+    Output:
+        The following values on the central grid:
+        dp_d = d(x + 0.5\delta x) + d(x)
+        dm_d = d(x - 0.5\delta x) + d(x)
+        Shape (n_1 - 2, ..., n_d - 2)
+    """
+    # FIXME: this should be replaced by _half_points_eval
+
+    dim = d.ndim
+
+    dp_d = []  # d^{+} + d
+    dm_d = []  # d^{-} + d
+
+    p1_sl, m1_sl, c_sl = _get_slicing_positions(dim)
+
+    for i in range(dim):
+
+        dp_d.append(0.5 * (d[p1_sl[i]] + d[c_sl]))
+        dm_d.append(0.5 * (d[m1_sl[i]] + d[c_sl]))
+
+    return dp_d, dm_d
+
+def _nabla_d_nabla_f(f: Tensor, idx2: Tensor, d_aux: Tuple[List[Tensor], List[Tensor]]) -> Tensor:
+    r"""
+    Numerical approximation of \nabla \cdot (d \nabla f) grid points
+    Input: f(x) values on the grid, shape (n_1, n_2, ..., n_d)
+    Output: \nabla \cdot (d \nabla f) on the central grid, shape (n_1 - 2, ..., n_d - 2)
+    """
+
+    dp_d, dm_d = d_aux
+
+    # detect settings from dp_d[0]
+    dim = dp_d[0].ndim
+    nx_center = dp_d[0].shape
+    factory_args = {"dtype": dp_d[0].dtype, "device": dp_d[0].device}
+
+    p1_sl, m1_sl, c_sl = _get_slicing_positions(dim)
+
+    if dim == f.ndim:
+        if torch.any(torch.as_tensor(f.shape) - 2 !=
+                     torch.as_tensor(nx_center)):
+            raise ValueError("Incorrect shape of f")
+
+        nab_d_nab_f = torch.zeros(
+            *nx_center, **factory_args)
+
+        for i in range(dim):
+            nab_d_nab_f += idx2[i] * (
+                dp_d[i] * (f[p1_sl[i]] - f[c_sl]) +
+                dm_d[i] * (f[m1_sl[i]] - f[c_sl])
+            )
+
+    elif dim == f.ndim - 1:
+        if torch.any(torch.as_tensor(f.shape[1:]) - 2 !=
+                     torch.as_tensor(nx_center)):
+            raise ValueError("Incorrect shape of f")
+
+        no_sl = [slice(None, None)]
+        nab_d_nab_f = torch.zeros(
+            f.shape[0], *nx_center, **factory_args)
+
+        for i in range(dim):
+            # broadcasting will appropriately expand the shape (*nx-2) to (m, *nx-2)
+            nab_d_nab_f += idx2[i] * (
+                dp_d[i] * (f[no_sl + p1_sl[i]] - f[no_sl + c_sl]) +
+                dm_d[i] * (f[no_sl + m1_sl[i]] - f[no_sl + c_sl])
+            )
+    else:
+        raise ValueError("Dimension mismatch between 'f' and 'dim'")
+
+    return nab_d_nab_f
+```
+`u.mul_(self.domain_mask)` ensures that u is zero outside the brain domain.
+`self._clip_state(u)` ensures that u stays in the range [0.,1.]
+
+Pressue dynamics:
+```
+kappa_field = kappa * (
+    omega[0] * kappa_ratios[0] +   # gm
+    omega[1] * kappa_ratios[1] +   # wm
+    omega[2] * 1.                 # csf
+)
+p[self.domain_mask] = self._pressure_field_interior(
+    self.M, kappa_field, self.alpha * u * (1 - u))
+p.mul_(self.domain_mask)
+```
+`kappa_field` calculates the relaxation factor.
+```
+def _pressure_field_interior(self, M: Tensor, Kappa: Tensor, F: Tensor) -> Tensor:
+
+    # NOTE: this version only solves the pressure field for the interior points
+
+    # p_sl, m_sl: slicing the plus-one/minus-one grids along each dim
+    p_sl, m_sl, _ = _get_slicing_positions(self.dim, no_boundary=False)
+
+    phi = self.phase_field
+    phi_hp = self.phase_aux  # phi on half points
+    sum_idx2 = torch.sum(self.idx2)
+
+    N = self.n_in_points
+    ind_interior = self.interior_indices  # in-domain grid point indexes
+    mask = self.domain_mask
+
+    rows, cols, vals = [], [], []
+
+    # --- Interior Points ---
+    # Diagonal terms: phi*(kappa + 2*M*(1/dx^2 + 1/dy^2 + 1/dz^2))
+    diag = phi * (Kappa + 2 * M * sum_idx2)
+    rows.append(ind_interior[mask].flatten())
+    cols.append(ind_interior[mask].flatten())
+    vals.append(diag[mask].flatten())
+
+    # Off-diagonal terms: -phi_{i+1/2,j,k} M / dx^2, ...
+    for i in range(self.dim):
+        is_p1sl_in_domain = mask[p_sl[i]]
+        is_m1sl_in_domain = mask[m_sl[i]]
+
+        # both minus-1 and plus-1 point are in domain
+        avail_mask = torch.logical_and(
+            is_p1sl_in_domain, is_m1sl_in_domain)
+
+        p_term = ind_interior[m_sl[i]][avail_mask], \
+            ind_interior[p_sl[i]][avail_mask], \
+            - M/self.dx[i]**2 * phi_hp[i][avail_mask]
+        m_term = ind_interior[p_sl[i]][avail_mask], \
+            ind_interior[m_sl[i]][avail_mask], \
+            - M/self.dx[i]**2 * phi_hp[i][avail_mask]
+        for r, c, v in [p_term, m_term]:
+            rows.append(r.flatten())
+            cols.append(c.flatten())
+            vals.append(v.flatten())
+
+    # Concatenate all entries
+    rows = torch.cat(rows)
+    cols = torch.cat(cols)
+    vals = torch.cat(vals)
+
+    # Create sparse matrix
+    A = torch.sparse_coo_tensor(
+        torch.stack([rows, cols]), vals,
+        (N, N), **self.factory_args
+    ).to_sparse_csr()
+
+    # Right-hand side: b = phi * F for interior points
+    b = (phi[mask] * F[mask]).flatten()
+
+    # sparse symmetric linear system by conjugate gradient
+    sol, _ = CG(A, b)
+
+    return sol.to(**self.factory_args)
+```
+`_pressure_field_interior` formulate the linear system defined by the numerical approximation to the Helmotz-type equations. 
+
+Brain tissue dynamics:
+```
+drho_dt = torch.zeros((3, *self.nx), **self.factory_args)
+for s in range(3):
+    for i in range(self.dim):
+        drho_dt[s][c_sl] -= \
+            v[i][c_sl] * (rho[s][p_sl[i]] - rho[s][m_sl[i]]) / (2 * self.dx[i]) + \
+            rho[s][c_sl] * (v[i][p_sl[i]] - v[i][m_sl[i]]) / (2 * self.dx[i])
+for s in range(3):
+    rho[s][c_sl] += dt * drho_dt[s][c_sl]
+    # _neumann_rect(rho[s])
+    rho[s].mul_(self.domain_mask)
+    if torch.sum(rho[s] < 0.) > 0:
+        print(f"Negative density at rho[{s}] occured and had been forced to 0.")
+        rho[s][rho[s] < 0.] = 0.
+```
+The advection equation is approximated by using center differences for gradients.

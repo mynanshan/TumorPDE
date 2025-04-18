@@ -6,6 +6,24 @@ from torch import Tensor
 from distmap import euclidean_signed_transform
 
 
+def focus_slice(x: Tensor,
+                focus: int,
+                focus_start: int | None = None,
+                focus_end: int | None = None,
+                focus_by: int | None = None,
+                other_start: int | None = None,
+                other_end: int | None = None, 
+                other_by: int | None = None) -> Tensor:
+    """
+    Slice an array with a list of slices.
+    Use one slice for the focused dimension and another slice for the other dimensions.
+    """
+    # TODO: slicing in the current codebase is quite messy, need to refactor
+    sl = [slice(other_start, other_end, other_by)] * x.ndim
+    sl[focus] = slice(focus_start, focus_end, focus_by)
+    return x[sl]
+
+
 def _get_slicing_positions(dim: int, no_boundary: bool = True) -> \
     Tuple[List[List[slice]], List[List[slice]], List[slice]]:
 
@@ -144,12 +162,49 @@ def _nabla_d_nabla_f(f: Tensor, idx2: Tensor, d_aux: Tuple[List[Tensor], List[Te
 
     return nab_d_nab_f
 
+# def _v_dot_nabla_u(v: Tensor, u: Tensor, dx: Tensor) -> Tensor:
+#     r"""
+#     Numerical approximation of v \cdot \nabla u on a grid
+#     Input: v(x), velocity field on the grid, shape (dim, n_1, n_2, ..., n_d)
+#            u(x), field on the grid, shape (n_1, n_2, ..., n_d)
+#     Output: v \cdot \nabla u on the central grid, shape (n_1 - 2, ..., n_d - 2)
+#     """
+#     # TODO: change to WENO5 in the future, currently using central differences
+
+#     dim = u.ndim
+
+#     p2_sl, m2_sl, c_sl = _get_slicing_positions(dim)
+
+#     nab_v_u = torch.zeros_like(u, dtype=u.dtype, device=u.device)
+
+#     for i in range(dim):
+#         nab_v_u[c_sl] += v[i][c_sl] * (u[p2_sl[i]] - u[m2_sl[i]]) / (2 * dx[i])
+
+#     return nab_v_u[c_sl]
+
+def _v_dot_nabla_u(v: Tensor, u: Tensor, dx: Tensor) -> Tensor:
+    nab_v_u = torch.zeros_like(u)
+    dim = v.shape[0]
+    p_sl, m_sl, c_sl = _get_slicing_positions(dim)
+    
+    for i in range(dim):
+        # Upwind scheme
+        v_pos = torch.where(v[i][c_sl] > 0, 1, 0)
+        v_neg = 1 - v_pos
+        
+        # Backward difference for positive velocity, forward for negative
+        grad_u_i = (v_pos * (u[c_sl] - u[m_sl[i]]) / dx[i] +
+                    v_neg * (u[p_sl[i]] - u[c_sl]) / dx[i])
+        
+        nab_v_u[c_sl] += v[i][c_sl] * grad_u_i
+        
+    return nab_v_u
 
 def _phase_field(mask: Tensor | NDArray, margin: float = 1.):
 
     mask = torch.as_tensor(mask)
     signed_dist = euclidean_signed_transform(mask)
-    phase = 0.5 * (1 - torch.tanh(3 * signed_dist / margin))
+    phase = 0.5 * (1. + torch.tanh(3 * signed_dist / margin))
 
     return phase
 

@@ -121,11 +121,14 @@ class TumorBase(ABC):
         self.x = tuple(torch.as_tensor(xi, **factory_args)
                        for xi in self.domain.voxel_marginal_coords)
         self.nx = torch.Size([len(xi) for xi in self.x])
+        self.n_points = int(math.prod(list(self.nx)))
         self.x_mesh = torch.stack(torch.meshgrid(
             *self.x, indexing="ij"))  # (ndim, *nx)
         self.dx = torch.as_tensor(self.domain.voxel_widths, **factory_args)
         self.idx2 = 1 / (self.dx ** 2)
-        self.domain_mask = torch.as_tensor(domain.voxel > 0., **factory_args)
+        self.domain_mask = torch.as_tensor(domain.voxel > 0.,
+                                           dtype=torch.bool, device=device)
+        self.n_in_points = int(self.domain_mask.sum().item())  # interior points
 
         # Torch factory settings
         self.factory_args = factory_args
@@ -165,9 +168,9 @@ class TumorBase(ABC):
                 init_learnable_params, **self.factory_args, requires_grad=autograd)
             self.nparam_init = self.init_learnable_params.numel()
             self.init_other_params = dict(init_other_params) if init_other_params is not None else {}
-            self.init_param_min = torch.tensor(init_param_min, **self.factory_args) \
+            self.init_param_min = torch.as_tensor(init_param_min, **self.factory_args) \
                   if init_param_min is not None else torch.tensor([], **self.factory_args)
-            self.init_param_max = torch.tensor(init_param_max, **self.factory_args) \
+            self.init_param_max = torch.as_tensor(init_param_max, **self.factory_args) \
                   if init_param_max is not None else torch.tensor([], **self.factory_args)
             if self.nparam_init != 0:
                 if self.init_param_min.numel() != self.nparam_init or \
@@ -184,14 +187,10 @@ class TumorBase(ABC):
 
         # parameters
         self.nparam = self.nparam_init
-        self.parameters = torch.tensor(
-            self.init_learnable_params.clone(), **self.factory_args)
-        self.wkparams_min = torch.tensor(
-            self.init_param_min.view(-1).clone(), **self.factory_args)
-        self.wkparams_max = torch.tensor(
-            self.init_param_max.view(-1).clone(), **self.factory_args)
-        self.wkparams_scale = torch.tensor(
-            (self.init_param_max - self.init_param_min).view(-1).clone(), **self.factory_args)
+        self.parameters = self.init_learnable_params.view(-1).clone().to(**self.factory_args)
+        self.wkparams_min = self.init_param_min.view(-1).clone().to(**self.factory_args)
+        self.wkparams_max = self.init_param_max.view(-1).clone().to(**self.factory_args)
+        self.wkparams_scale = (self.init_param_max - self.init_param_min).view(-1).clone().to(**self.factory_args)
 
     def _clip_state(self, u: Tensor) -> None:
         u.clamp_(0.0, 1.0)
@@ -272,22 +271,19 @@ class TumorVarFieldBase(TumorBase):
                          init_param_min, init_param_max,
                          autograd, dtype, device)
 
-        # self.diff_map = torch.as_tensor(domain.voxel, **self.factory_args)
-        # self.diff_map_aux = _fd_auxiliaries(self.diff_map)
-
         self.matters = torch.as_tensor(matters, dtype=dtype)
-        assert self.matters.shape[0] != 3
+        assert self.matters.shape[0] == 3
         assert self.matters.shape[1:] == torch.Size(self.domain.voxel_shape)
 
-        self.phase_field = _phase_field(self.domain.voxel, min(self.dx.tolist()))
+        # NOTE: current phase field function does not support unidentical voxel widths
+        self.phase_field = _phase_field(self.domain.voxel, 3)
         self.phase_aux = _half_points_eval(self.phase_field)
 
-        # TODO: provide a function to compute and save additional grids
-        # save grid indices
-        self.indices = torch.arange(math.prod(list(self.nx)),
-                               dtype=torch.long, device=device).reshape(*self.nx)
+        # indexing all grid points
+        self.indices = torch.arange(
+            self.n_points, dtype=torch.long, device=device).reshape(*self.nx)
 
-        # Interior mask (1-based indices for Python 0-based)
-        # _, _, c_sl = _get_slicing_positions(self.dim)
-        # self.cube_interior = torch.zeros(*self.nx, dtype=torch.bool, device=device)
-        # self.cube_interior[c_sl] = True
+        # indexing in-domain grid points, -1 for out-of-domain points
+        self.interior_indices = -torch.ones(*self.nx, dtype=torch.long, device=device)
+        self.interior_indices[self.domain_mask] = torch.arange(
+            self.domain_mask.sum().item()).to(dtype=torch.long, device=device)
