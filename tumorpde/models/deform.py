@@ -3,7 +3,6 @@ import math
 import numpy as np
 import torch
 from torch import Tensor
-from torch.sparse import spdiags
 from scipy.optimize import minimize
 from tqdm import tqdm
 import nibabel as nib
@@ -14,9 +13,13 @@ from tumorpde.models._base import TumorVarFieldBase
 from tumorpde.models.comp_utils import _get_slicing_positions
 from tumorpde.models.comp_utils import _nabla_d_nabla_f, _v_dot_nabla_u
 from tumorpde.models.comp_utils import _fd_auxiliaries
-from tumorpde.models.comp_utils import focus_slice
-# from tumorpde.models.comp_utils import _neumann_rect
 from tumorpde.calc.linalg import CG
+
+"""
+TODO: critical rethinking: is the current model realistic enough?
+- Lipkova's tumor is not like a tissue: it does not directly interact, push, or squeeze other tissues.
+Instead, its growth creates a pressure field that pushes the surrounding tissues.
+"""
 
 
 class TumorBrainDeformState:
@@ -138,11 +141,7 @@ class TumorDeformFD(TumorVarFieldBase):
         D_ratio = torch.as_tensor(D_ratio, **self.factory_args)
         kappa_ratios = torch.as_tensor(kappa_ratios, **self.factory_args)
         init_params = self.init_learnable_params.clone()
-        self.parameters = self._format_parameters(
-            D, alpha, M, kappa,
-            D_ratio, kappa_ratios,
-            init_params
-        )
+
         # parameters indexes:
         # 0 - D
         # 1 - alpha
@@ -151,6 +150,20 @@ class TumorDeformFD(TumorVarFieldBase):
         # 4:4+nparam_init - init_params
         # 4+nparam_init:4+nparam_init+1 - D_ratio
         # 4+nparam_init+1:4+nparam_init+3 - kappa_ratios
+        parameters = self._format_parameters(
+            D, alpha, M, kappa,
+            D_ratio, kappa_ratios,
+            init_params
+        )
+        self._set_parameters(parameters)
+
+        # Whether to estimate the ratios
+        self.estimate_ratios = estimate_ratios
+    
+    def _set_parameters(self, parameters: Tensor):
+
+        self.parameters = parameters.flatten()
+        assert self.parameters.numel() == self.nparam
 
         # Settings for the training process
         # parameters with proper resizing are called working parameters
@@ -160,22 +173,21 @@ class TumorDeformFD(TumorVarFieldBase):
             self.init_param_min.view(-1).clone(),
             torch.tensor([1e-4] * 3, **self.factory_args)])
         self.wkparams_max = torch.cat([
-            1e3 * D.view(-1).clone(),
-            1e3 * alpha.view(-1).clone(),
-            1e3 * M.view(-1).clone(),
-            1e3 * kappa.view(-1).clone(),
+            1e3 * self.D.view(-1).clone(),
+            1e3 * self.alpha.view(-1).clone(),
+            1e3 * self.M.view(-1).clone(),
+            1e3 * self.kappa.view(-1).clone(),
             self.init_param_max.view(-1).clone(),
             torch.tensor([1.] * 3, **self.factory_args)])
         self.wkparams_scale = torch.cat([
-            D.view(-1).clone(),
-            alpha.view(-1).clone(),
-            M.view(-1).clone(),
-            kappa.view(-1).clone(),
+            self.D.view(-1).clone(),
+            self.alpha.view(-1).clone(),
+            self.M.view(-1).clone(),
+            self.kappa.view(-1).clone(),
             (self.init_param_max - self.init_param_min).view(-1).clone(),
             torch.tensor([1.] * 3, **self.factory_args)])
-
-        # Whether to estimate the ratios
-        self.estimate_ratios = estimate_ratios
+        # NOTE: there's no need to use the name "wkparams" for working parametrs.
+        # Should be just params. Consider renaming it in the future.
 
     @property
     def D(self):
@@ -259,14 +271,15 @@ class TumorDeformFD(TumorVarFieldBase):
 
         # check if dt is small enough
         cfl = 0.25  # I chose this randomly
-        ref_dt = cfl * min(min(dx)**2 / D, min(dx) / vmax)
+        ref_dt = cfl * min(min(dx)**2 / (D + 1e-4), min(dx) / (vmax + 1e-4))
         if dt > ref_dt:
             dt = ref_dt
             print(f"Change dt to {dt}.")
 
         return dt
 
-    def solve(self, dt: float = 0.001, t1: float = 1.,
+    def solve(self, state: TumorBrainDeformState | None = None,
+              dt: float = 0.001, t1: float = 1.,
               D: Optional[Tensor] = None, alpha: Optional[Tensor] = None,
               M: Optional[Tensor] = None, kappa: Optional[Tensor] = None,
               D_ratio: Optional[Tensor] = None,
@@ -288,7 +301,9 @@ class TumorDeformFD(TumorVarFieldBase):
         t_span = t1 - t0
 
         # initialization
-        state = self.init_state(self._init_params(parameters))
+        if state is None:
+            state = self.init_state(self._init_params(parameters))
+        assert isinstance(state, TumorBrainDeformState)
 
         # forward
         ti = t0
@@ -307,7 +322,7 @@ class TumorDeformFD(TumorVarFieldBase):
 
             self.forward_update(state, dt, parameters)
 
-        return state
+        return state, t
 
     def init_state(self, init_params: Tensor) -> TumorBrainDeformState:
 
@@ -352,34 +367,29 @@ class TumorDeformFD(TumorVarFieldBase):
                         D_ratio: Tensor, kappa_ratios: Tensor,
                         weno: bool = False) -> None:
         # TODO: add support for weno
-        # TODO: critical rethinking: is the current model realistic enough?
 
         # rho: gm, wm, csf
-        # in-place update of u, rho, and p.
+        # in-place update of u, rho, p, v.
 
         p_sl, m_sl, c_sl = _get_slicing_positions(self.dim)
-
-        # TODO: double check boundary conditions for p, v, u, rho
 
         # pressure field
         # the const term F is alpha * u * (1 - u)
         kappa_field = kappa * (
             omega[0] * kappa_ratios[0] +   # gm
             omega[1] * kappa_ratios[1] +   # wm
-            omega[2] * 1.                 # csf
+            omega[2] * 1.                  # csf
         )
-        # p[c_sl] = self._pressure_field(
-        #     self.M, kappa_field, self.alpha * u * (1 - u))
         p[self.domain_mask] = self._pressure_field_interior(
             self.M, kappa_field, self.alpha * u * (1 - u))
         p.mul_(self.domain_mask)
+        self.pad_boundary(p)
 
         # deformation velocity field
         for i in range(self.dim):
             v[i][c_sl] = - M * (p[p_sl[i]] - p[m_sl[i]]) / (2 * self.dx[i])
             v[i].mul_(self.domain_mask)
-            if v[i][90] > v[i][89]:
-                print("Error")
+            self.pad_boundary(v[i])
 
         # diffusion rate field and its finite-difference aux
         diff_field = omega[0] * D_ratio + omega[1]
@@ -392,6 +402,7 @@ class TumorDeformFD(TumorVarFieldBase):
         u[c_sl] += dt * du_dt
         u.mul_(self.domain_mask)
         self._clip_state(u)
+        self.pad_boundary(u)
 
         # update brain tissue density
         # TODO: change to WENO5 in the future, currently using central differences
@@ -399,9 +410,6 @@ class TumorDeformFD(TumorVarFieldBase):
         drho_dt = torch.zeros((3, *self.nx), **self.factory_args)
         for s in range(3):
             for i in range(self.dim):
-                # drho_dt[s][c_sl] -= \
-                #     v[i][c_sl] * (rho[s][p_sl[i]] - rho[s][m_sl[i]]) / (2 * self.dx[i]) + \
-                #     rho[s][c_sl] * (v[i][p_sl[i]] - v[i][m_sl[i]]) / (2 * self.dx[i])
 
                 # Upwind scheme for advection term
                 v_pos = torch.where(v[i][c_sl] > 0, 1, 0)
@@ -418,18 +426,18 @@ class TumorDeformFD(TumorVarFieldBase):
 
             # update brain tissue 
             rho[s][c_sl] += dt * drho_dt[s][c_sl]
-
-            # _neumann_rect(rho[s])
             rho[s].mul_(self.domain_mask)
+
             # After updating rho[s]:
             rho_positive = torch.clamp(rho[s], min=0.0)
             mass_loss = torch.sum(rho[s] - rho_positive)
             rho[s] = rho_positive + \
                 mass_loss / torch.sum(self.domain_mask) * self.domain_mask  # Redistribute lost mass
+            
+            # boundary conditions
+            self.pad_boundary(rho[s])
 
     def _pressure_field_interior(self, M: Tensor, Kappa: Tensor, F: Tensor) -> Tensor:
-
-        # NOTE: this version only solves the pressure field for the interior points
 
         # p_sl, m_sl: slicing the plus-one/minus-one grids along each dim
         p_sl, m_sl, _ = _get_slicing_positions(self.dim, no_boundary=False)
@@ -484,67 +492,6 @@ class TumorDeformFD(TumorVarFieldBase):
 
         # Right-hand side: b = phi * F for interior points
         b = (phi[mask] * F[mask]).flatten()
-
-        # sparse symmetric linear system by conjugate gradient
-        sol, _ = CG(A, b)
-
-        return sol.to(**self.factory_args)
-
-    def _pressure_field(self, M: Tensor, Kappa: Tensor, F: Tensor) -> Tensor:
-
-        # NOTE: this version solves the pressure field for all points
-        # but it has to be used in adjunction with the diffused domain method
-
-        # c_sl: slicing the interior
-        # p2_sl, m2_sl: plus-1/minus-1 slice wrt the interior
-        p2_sl, m2_sl, c_sl = _get_slicing_positions(self.dim)
-        p_sl, m_sl, _ = _get_slicing_positions(self.dim, no_boundary=False)
-
-        N = math.prod(n-2 for n in list(self.nx))
-        phi = self.phase_field
-        phi_hp = self.phase_aux  # phi on half points
-        sum_idx2 = torch.sum(self.idx2)
-
-        ind = self.indices  # all grid point indexes
-
-        rows, cols, vals = [], [], []
-
-        # --- Interior Points ---
-        # Diagonal terms: phi*(kappa + 2*M*(1/dx^2 + 1/dy^2 + 1/dz^2))
-        diag = phi[c_sl] * (Kappa[c_sl] + 2 * M * sum_idx2)
-        rows.append(ind[c_sl].flatten())
-        cols.append(ind[c_sl].flatten())
-        vals.append(diag.flatten())
-
-        # Off-diagonal terms: -phi_{i+1/2,j,k} M / dx^2, ...
-        for i in range(self.dim):
-
-            # if plus-1 point is in domain
-            p_term = ind[c_sl][m_sl[i]], \
-                ind[c_sl][p_sl[i]], \
-                - M/self.dx[i]**2 * phi_hp[i][c_sl]
-            # if minus-1 point is in domain
-            m_term = ind[c_sl][p_sl[i]], \
-                ind[c_sl][m_sl[i]], \
-                - M/self.dx[i]**2 * phi_hp[i][c_sl]
-            for r, c, v in [p_term, m_term]:
-                rows.append(r.flatten())
-                cols.append(c.flatten())
-                vals.append(v.flatten())
-
-        # Concatenate all entries
-        rows = torch.cat(rows)
-        cols = torch.cat(cols)
-        vals = torch.cat(vals)
-
-        # Create sparse matrix
-        A = torch.sparse_coo_tensor(
-            torch.stack([rows, cols]), vals,
-            (N, N), **self.factory_args
-        ).to_sparse_csr()
-
-        # Right-hand side: b = phi * F for interior points
-        b = (phi[c_sl] * F[c_sl]).flatten()
 
         # sparse symmetric linear system by conjugate gradient
         sol, _ = CG(A, b)

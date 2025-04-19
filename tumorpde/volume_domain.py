@@ -43,14 +43,13 @@ class VolumeDomain:
             zip(self.xmin, self.xmax, self.voxel_shape, self.voxel_widths))
         self.voxel_marginal_divides = tuple(np.linspace(
             l, u, n + 1) for l, u, n in zip(self.xmin, self.xmax, self.voxel_shape))
-        self.boundary_voxels = self._get_boundary_locations()
-        boundary_indices = np.argwhere(self.boundary_voxels)
+        self.boundary_mask = self._get_boundary_locations()
+        self.boundary_indices = np.argwhere(self.boundary_mask)
         self.boundary_anchors = np.column_stack(
-            [self.voxel_marginal_coords[i][boundary_indices[:, i]]
+            [self.voxel_marginal_coords[i][self.boundary_indices[:, i]]
                 for i in range(self.dim)]
         )
         
-
     def _get_voxel_indices(self, x):
         idx = tuple(np.searchsorted(
             self.voxel_marginal_divides[i], x[:, i], side='left') - 1 for i in range(self.dim))
@@ -96,7 +95,7 @@ class VolumeDomain:
 
     def on_boundary(self, x):
         idx = self._get_voxel_indices(x)
-        return self.boundary_voxels[idx]
+        return self.boundary_mask[idx]
 
     def uniform_points(self, n, boundary=True):
         dx = (self.bbox_volume / n) ** (1 / self.dim)

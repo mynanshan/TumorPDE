@@ -1,9 +1,10 @@
 from typing import List, Tuple
+import numpy as np
 from numpy.typing import NDArray
 
 import torch
 from torch import Tensor
-from distmap import euclidean_signed_transform
+from tumorpde.calc.dist_boundary import signed_distance_and_nearest_index
 
 
 def focus_slice(x: Tensor,
@@ -91,7 +92,7 @@ def _fd_auxiliaries(d: Tensor) -> Tuple[List[Tensor], List[Tensor]]:
     return dp_d, dm_d
 
 
-def _half_points_eval(u: Tensor) -> List[Tensor]:
+def half_points_eval(u: Tensor) -> List[Tensor]:
     r"""
     Auxiliaries for numerical approximation of a field on half-point grids
     Input: u(x_1, ..., x_d), field on the grid, shape (n_1, ..., n_d)
@@ -200,11 +201,20 @@ def _v_dot_nabla_u(v: Tensor, u: Tensor, dx: Tensor) -> Tensor:
         
     return nab_v_u
 
-def _phase_field(mask: Tensor | NDArray, margin: float = 1.):
 
-    mask = torch.as_tensor(mask)
-    signed_dist = euclidean_signed_transform(mask)
-    phase = 0.5 * (1. + torch.tanh(3 * signed_dist / margin))
+# def _phase_field(mask: Tensor | NDArray, margin: float = 1.):
+
+#     mask = torch.as_tensor(mask)
+#     signed_dist = euclidean_signed_transform(mask)
+#     phase = 0.5 * (1. + torch.tanh(3 * signed_dist / margin))
+
+#     return phase
+
+
+def phase_field(mask: NDArray, margin: float = 1.):
+
+    signed_dist, _ = signed_distance_and_nearest_index(mask)
+    phase = 0.5 * (1. - np.tanh(3 * signed_dist / margin))
 
     return phase
 

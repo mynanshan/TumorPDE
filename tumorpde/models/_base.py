@@ -1,14 +1,16 @@
 from typing import Callable, Optional, Dict, List
 from abc import ABC, abstractmethod
 import math
+import numpy as np
 import torch
 from torch import Tensor
 
-from tumorpde.models.comp_utils import _fd_auxiliaries, _half_points_eval
+from tumorpde.models.comp_utils import _fd_auxiliaries, half_points_eval
 from tumorpde.models.comp_utils import _get_slicing_positions
-from tumorpde.models.comp_utils import _phase_field
+from tumorpde.models.comp_utils import phase_field
 from tumorpde.volume_domain import VolumeDomain
 from tumorpde._typing import TensorLikeFloat
+from tumorpde.calc.dist_boundary import signed_distance_and_nearest_index
 
 
 
@@ -275,9 +277,9 @@ class TumorVarFieldBase(TumorBase):
         assert self.matters.shape[0] == 3
         assert self.matters.shape[1:] == torch.Size(self.domain.voxel_shape)
 
-        # NOTE: current phase field function does not support unidentical voxel widths
-        self.phase_field = _phase_field(self.domain.voxel, 3)
-        self.phase_aux = _half_points_eval(self.phase_field)
+        # NOTE: current phase field function does not support anisotropic voxel widths
+        self.phase_field = torch.tensor(phase_field(self.domain.voxel, 2), **self.factory_args)
+        self.phase_aux = half_points_eval(self.phase_field)
 
         # indexing all grid points
         self.indices = torch.arange(
@@ -286,4 +288,33 @@ class TumorVarFieldBase(TumorBase):
         # indexing in-domain grid points, -1 for out-of-domain points
         self.interior_indices = -torch.ones(*self.nx, dtype=torch.long, device=device)
         self.interior_indices[self.domain_mask] = torch.arange(
-            self.domain_mask.sum().item()).to(dtype=torch.long, device=device)
+            self.domain_mask.sum().item()).to(dtype=torch.long, device=device) 
+        
+        # boundary mask and the coordinates
+        self.boundary_mask = torch.tensor(self.domain.boundary_mask, dtype=torch.bool, device=device)
+        self.boundary_coords = torch.where(self.boundary_mask)
+
+        # nearest coordinates for each boundary voxel
+        _, nearest_indices = signed_distance_and_nearest_index(self.domain.voxel)
+        nearest_coords = np.unravel_index(nearest_indices, self.domain.voxel.shape)
+        self.boundary_nearest_coords = tuple(
+            torch.as_tensor(coords, dtype=torch.long, device=device)[self.boundary_mask] \
+                for coords in nearest_coords
+        )
+
+        # Is the boundary voxel on the "left" or "right" of its in-domain neighbour
+        self.boundary_direc = tuple(
+            np.sign(bnd_coord - in_coord) for bnd_coord, in_coord in \
+                zip(self.boundary_coords, self.boundary_nearest_coords)
+        )
+    
+    def pad_boundary(self, u: Tensor) -> None:
+        """
+        Pad the boundary of the input tensor u with the values of its nearest in-domain neighbour.
+        Args:
+            u: Tensor, the input tensor.
+        Returns:
+            Tensor, the padded tensor.
+        """
+        assert u.shape == self.nx
+        u[self.boundary_coords] = u[self.boundary_nearest_coords]
