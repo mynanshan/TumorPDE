@@ -23,8 +23,10 @@ atlas_gm = ants.image_read(os.path.join(
     atlas_path, "atlas_gm.nii"), reorient=True)
 atlas_wm = ants.image_read(os.path.join(
     atlas_path, "atlas_wm.nii"), reorient=True)
-atlas_csf = ants.image_read(os.path.join(
-    atlas_path, "atlas_csf.nii"), reorient=True)
+atlas_csf_in = ants.image_read(os.path.join(
+    atlas_path, "atlas_csf_in.nii"), reorient=True)
+atlas_csf_out = ants.image_read(os.path.join(
+    atlas_path, "atlas_csf_out.nii"), reorient=True)
 
 atlas_t1 = atlas_t1 * atlas_mask
 del atlas_mask
@@ -91,15 +93,18 @@ for i in range(num_scan):
         fixed=patient_t1, moving=atlas_gm, transformlist=reg['fwdtransforms'])
     warped_wm = ants.apply_transforms(
         fixed=patient_t1, moving=atlas_wm, transformlist=reg['fwdtransforms'])
-    warped_csf = ants.apply_transforms(
-        fixed=patient_t1, moving=atlas_csf, transformlist=reg['fwdtransforms'])
+    warped_csf_in = ants.apply_transforms(
+        fixed=patient_t1, moving=atlas_csf_in, transformlist=reg['fwdtransforms'])
+    warped_csf_out = ants.apply_transforms(
+        fixed=patient_t1, moving=atlas_csf_out, transformlist=reg['fwdtransforms'])
 
     # Save the transformed images
     warped_atlas.to_file(os.path.join(
         dir_path, f'{patient}{scan_id}_brain_normalized.nii.gz'))
     warped_gm.to_file(os.path.join(dir_path, f'{patient}{scan_id}_gm_normalized.nii.gz'))
     warped_wm.to_file(os.path.join(dir_path, f'{patient}{scan_id}_wm_normalized.nii.gz'))
-    warped_csf.to_file(os.path.join(dir_path, f'{patient}{scan_id}_csf_normalized.nii.gz'))
+    warped_csf_in.to_file(os.path.join(dir_path, f'{patient}{scan_id}_csf_in_normalized.nii.gz'))
+    warped_csf_out.to_file(os.path.join(dir_path, f'{patient}{scan_id}_csf_out_normalized.nii.gz'))
 
     # Save the transformation filenames
     np.savetxt(os.path.join(
