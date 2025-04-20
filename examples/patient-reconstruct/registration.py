@@ -20,13 +20,13 @@ atlas_t1 = ants.image_read(os.path.join(
 atlas_mask = ants.image_read(os.path.join(
     atlas_path, "atlas_mask.nii"), reorient=True)
 atlas_gm = ants.image_read(os.path.join(
-    atlas_path, "atlas_gm.nii"), reorient=True)
+    atlas_path, "atlas_gm_c.nii"), reorient=True)  # cleaned gm
 atlas_wm = ants.image_read(os.path.join(
-    atlas_path, "atlas_wm.nii"), reorient=True)
+    atlas_path, "atlas_wm_c.nii"), reorient=True)  # cleaned wm
 atlas_csf_in = ants.image_read(os.path.join(
-    atlas_path, "atlas_csf_in.nii"), reorient=True)
+    atlas_path, "atlas_csf_in.nii"), reorient=True)  # inner csf
 atlas_csf_out = ants.image_read(os.path.join(
-    atlas_path, "atlas_csf_out.nii"), reorient=True)
+    atlas_path, "atlas_csf_out.nii"), reorient=True)  # outer csf
 
 atlas_t1 = atlas_t1 * atlas_mask
 del atlas_mask
