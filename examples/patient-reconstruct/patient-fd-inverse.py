@@ -317,7 +317,7 @@ if args.multi_scan == 1:
 
 if args.fixed_init == 1:
 
-    def init_density_func(x, rmax = 0.1):
+    def init_density_func(x, params = None | torch.Tensor, rmax = 0.1):
         return rmax * torch.as_tensor(tumor_list[0], device=device)
 
     init_density_params = {"rmax": 0.3}
@@ -327,7 +327,7 @@ if args.fixed_init == 1:
         init_density_func=init_density_func,
         init_other_params=init_density_params, device=device)
 
-    print("Calibrating model for single scan")
+    print("Calibrating model for post-op scans")
 
     result = fd_pde.calibrate_model(
         obs=torch.as_tensor(tumor_list[-1], device=device),

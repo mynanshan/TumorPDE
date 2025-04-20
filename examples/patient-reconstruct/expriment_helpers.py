@@ -44,7 +44,7 @@ def read_patient_data(patient: str, test: bool = False, mask_ids: List[int] = [1
     csf_in, _, _ = ndarray_from_nifty(os.path.join(
         dir_path, patient, f'{patient}{ref}_csf_in_normalized.nii.gz'))
     csf_out, _, _ = ndarray_from_nifty(os.path.join(
-        dir_path, patient, f'{patient}{ref}_csf_out_normalized_in.nii.gz'))
+        dir_path, patient, f'{patient}{ref}_csf_out_normalized.nii.gz'))
     tumor_list = []
     for ii in mask_ids:
         tumor, _, _ = ndarray_from_nifty(os.path.join(
