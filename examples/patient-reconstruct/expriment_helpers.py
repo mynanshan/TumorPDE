@@ -41,8 +41,10 @@ def read_patient_data(patient: str, test: bool = False, mask_ids: List[int] = [1
         dir_path, patient, f'{patient}{ref}_gm_normalized.nii.gz'))
     wm, _, _ = ndarray_from_nifty(os.path.join(
         dir_path, patient, f'{patient}{ref}_wm_normalized.nii.gz'))
-    csf, _, _ = ndarray_from_nifty(os.path.join(
-        dir_path, patient, f'{patient}{ref}_csf_normalized.nii.gz'))
+    csf_in, _, _ = ndarray_from_nifty(os.path.join(
+        dir_path, patient, f'{patient}{ref}_csf_in_normalized.nii.gz'))
+    csf_out, _, _ = ndarray_from_nifty(os.path.join(
+        dir_path, patient, f'{patient}{ref}_csf_out_normalized_in.nii.gz'))
     tumor_list = []
     for ii in mask_ids:
         tumor, _, _ = ndarray_from_nifty(os.path.join(
@@ -64,7 +66,8 @@ def read_patient_data(patient: str, test: bool = False, mask_ids: List[int] = [1
         raw_t1 = zoom(raw_t1, zoom_factors, order=1)
         gm = zoom(gm, zoom_factors, order=1)
         wm = zoom(wm, zoom_factors, order=1)
-        csf = zoom(csf, zoom_factors, order=1)
+        csf_in = zoom(csf_in, zoom_factors, order=1)
+        csf_out = zoom(csf_out, zoom_factors, order=1)
         for i in range(len(tumor_list)):
             tumor_list[i] = zoom(tumor_list[i], zoom_factors, order=1)
     
@@ -83,7 +86,8 @@ def read_patient_data(patient: str, test: bool = False, mask_ids: List[int] = [1
         "t1": raw_t1,
         "gm": gm,
         "wm": wm,
-        "csf": csf,
+        "csf_in": csf_in,
+        "csf_out": csf_out,
         "tumor": tumor_list,
         "aff_info": aff_info,
         "header": header

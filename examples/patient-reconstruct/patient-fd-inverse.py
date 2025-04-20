@@ -115,7 +115,7 @@ data_path = data["dir_path"]
 brain_raw = data["t1"]
 gm = data["gm"]
 wm = data["wm"]
-csf = data["csf"]
+csf_in = data["csf_in"]
 tumor_list = data["tumor"]
 aff_info = data["aff_info"]
 header = data["header"]
@@ -136,10 +136,10 @@ print(f"Brain array shape: {brain_raw.shape}")
 
 
 # formulate the diffusivity field
-print(f"Max check > gm: {gm.max()}, wm: {wm.max()}, csf: {csf.max()}")
-print(f"Min check > gm: {gm.min()}, wm: {wm.min()}, csf: {csf.min()}")
-vox = (0.05 * gm + 0.94 * wm + 0.01 * csf).copy()
-del gm, wm, csf
+print(f"Max check > gm: {gm.max()}, wm: {wm.max()}, csf_in: {csf_in.max()}")
+print(f"Min check > gm: {gm.min()}, wm: {wm.min()}, csf_in: {csf_in.min()}")
+vox = (0.05 * gm + 0.94 * wm + 0.01 * csf_in).copy()
+del gm, wm, csf_in
 
 # Define the spatial domain
 # assume the voxel has equal width along each axis pixel
