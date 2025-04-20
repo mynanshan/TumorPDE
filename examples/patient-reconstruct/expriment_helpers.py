@@ -142,7 +142,7 @@ def _vis_brain_scan(
         underlays: List[NDArray],
         tumors: List[NDArray],
         figsize: Tuple[float, float],
-        main_title: str,
+        main_title: str = "",
         time_info: str = "",
         show: bool = True,
         file_prefix: List[str] = [""],
