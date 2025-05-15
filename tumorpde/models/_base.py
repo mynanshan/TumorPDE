@@ -304,7 +304,7 @@ class TumorVarFieldBase(TumorBase):
 
         # Is the boundary voxel on the "left" or "right" of its in-domain neighbour
         self.boundary_direc = tuple(
-            np.sign(bnd_coord - in_coord) for bnd_coord, in_coord in \
+            torch.sign(bnd_coord - in_coord) for bnd_coord, in_coord in \
                 zip(self.boundary_coords, self.boundary_nearest_coords)
         )
     
