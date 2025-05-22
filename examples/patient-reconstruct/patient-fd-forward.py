@@ -170,6 +170,9 @@ basic_plot_args = {
             }
 save_args = {'affine': aff_info, 'header': header, 'patient': patient}
 
+plot_period = 50
+save_period = 50
+
 
 if args.single_scan == 1:
 
@@ -199,10 +202,10 @@ if args.single_scan == 1:
 
     u, _, _ = fd_pde.solve(
         dt=0.001, t1=1.2 * t1, D=D, alpha=alpha, init_params=cx,
-        plot_func=visualize_model_fit, plot_period=50,
+        plot_func=visualize_model_fit, plot_period=plot_period,
         plot_args = plot_args,
         save_all=False, save_dir=save_dir,
-        save_period=500, save_args=save_args)
+        save_period=save_period, save_args=save_args)
 
 if args.multi_scan == 1:
 
@@ -274,10 +277,10 @@ if args.multi_scan == 1:
 
     u, _, _ = fd_pde.solve(
         dt=0.001, t1=1.2*t1, D=D, alpha=alpha, init_params=cx,
-        plot_func=visualize_model_fit_multiscan, plot_period=50,
+        plot_func=visualize_model_fit_multiscan, plot_period=plot_period,
         plot_args = plot_args,
         save_all=False, save_dir=save_dir,
-        save_period=500, save_args=save_args)
+        save_period=save_period, save_args=save_args)
 
 
 if args.fixed_init == 1:
@@ -305,7 +308,7 @@ if args.fixed_init == 1:
 
     u, _, _ = fd_pde.solve(
         dt=0.001, t1=1.2 * t1, D=D, alpha=alpha,
-        plot_func=visualize_model_fit, plot_period=50,
+        plot_func=visualize_model_fit, plot_period=plot_period,
         plot_args = plot_args,
         save_all=False, save_dir=save_dir,
-        save_period=500, save_args=save_args)
+        save_period=save_period, save_args=save_args)

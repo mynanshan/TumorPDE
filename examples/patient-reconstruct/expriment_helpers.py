@@ -115,10 +115,10 @@ def weighted_center(u: NDArray) -> NDArray:
     return weighted_sum / total_weight
 
 
-def append_parameters_to_file(file_path, patient, experiment_type, D, rho, x0, t1=None):
+def append_parameters_to_file(file_path, patient, experiment_type, D, alpha, x0, t1=None):
     current_datetime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     new_row = [current_datetime, patient,
-               experiment_type, D, rho, x0[0], x0[1], x0[2],
+               experiment_type, D, alpha, x0[0], x0[1], x0[2],
                t1 if t1 is not None else ""]
 
     # Read existing content
@@ -130,7 +130,7 @@ def append_parameters_to_file(file_path, patient, experiment_type, D, rho, x0, t
     except FileNotFoundError:
         # If file doesn't exist, create it with a header
         existing_rows = [["Datetime", "Patient", "Experiment Type",
-                          "D", "rho", "x0[0]", "x0[1]", "x0[2]", "t1"]]
+                          "D", "alpha", "x0[0]", "x0[1]", "x0[2]", "t1"]]
 
     # Insert new row at the beginning (after header)
     existing_rows.insert(1, new_row)
