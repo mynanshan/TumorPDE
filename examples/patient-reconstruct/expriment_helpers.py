@@ -25,7 +25,8 @@ def ndarray_from_nifty(filename: str):
 
     return A, affine_info, header
 
-def read_patient_data(patient: str, test: bool = False, mask_ids: List[int] = [1,2], ref: int = 1):
+
+def read_patient_data(patient: str, test: bool = False, mask_ids: List[int] = [1, 2], ref: int = 1):
 
     if test:
         zoom_factors = 0.05
@@ -54,9 +55,10 @@ def read_patient_data(patient: str, test: bool = False, mask_ids: List[int] = [1
 
     # Ensure tumor2 matches tumor1 shape
     if len(tumor_list) > 1:
-        for i in range(1,len(tumor_list)):
+        for i in range(1, len(tumor_list)):
             if tumor_list[i].shape != tumor_list[0].shape:
-                print(f"Scan {i+1} and Scan 1 have different shapes. Resizing tumor mask {i+1}.")
+                print(
+                    f"Scan {i+1} and Scan 1 have different shapes. Resizing tumor mask {i+1}.")
                 tumor_list[i] = resize_to_match(tumor_list[0], tumor_list[i])
 
     # If image is too large
@@ -70,7 +72,7 @@ def read_patient_data(patient: str, test: bool = False, mask_ids: List[int] = [1
         csf_out = zoom(csf_out, zoom_factors, order=1)
         for i in range(len(tumor_list)):
             tumor_list[i] = zoom(tumor_list[i], zoom_factors, order=1)
-    
+
     print("Read data:")
     print(f"Patient brain, shape: {brain.shape}")
     print(f"Patient raw scan, shape: {raw_t1.shape}")
@@ -93,6 +95,7 @@ def read_patient_data(patient: str, test: bool = False, mask_ids: List[int] = [1
         "header": header
     }
 
+
 def resize_to_match(target, source):
     """
     Resizes the `source` array to match the shape of the `target` array.
@@ -100,12 +103,14 @@ def resize_to_match(target, source):
     zoom_factors = np.array(target.shape) / np.array(source.shape)
     return zoom(source, zoom_factors, order=1)
 
+
 def binarize_img(img: NDArray, thresh: float = 0.5) -> NDArray:
-    
+
     img = (img - img.min()) / (img.max() - img.min())
     img[img > thresh] = 1.
     img[img <= thresh] = 0.
     return img
+
 
 def weighted_center(u: NDArray) -> NDArray:
     N = u.shape
@@ -151,12 +156,12 @@ def _vis_brain_scan(
         show: bool = True,
         file_prefix: List[str] = [""],
         save_dir: Optional[str] = None, idx: int = 0):
-    
+
     nrow = 4
     ncol = 4
-    slice_fracs = np.linspace(0.2, 0.8, nrow * ncol).reshape((nrow,ncol))
-    tumor_colors = ["yellow", (0.2,1.,0.2,1.), (0.2,0.2,1.,1.)]
-    
+    slice_fracs = np.linspace(0.2, 0.8, nrow * ncol).reshape((nrow, ncol))
+    tumor_colors = ["yellow", (0.2, 1., 0.2, 1.), (0.2, 0.2, 1., 1.)]
+
     for img, fpre in zip(underlays, file_prefix):
 
         img = 0.8 * img / img.max()
@@ -171,7 +176,7 @@ def _vis_brain_scan(
                 # get the current slices
                 example_idx = int(img.shape[2] * slice_fracs[j][i])
                 sl = [slice(None)] * 3
-                sl[2] = slice(example_idx, example_idx+1) # the axiel slice
+                sl[2] = slice(example_idx, example_idx+1)  # the axiel slice
                 sl = tuple(sl)
 
                 # plot the underlay
@@ -188,21 +193,23 @@ def _vis_brain_scan(
                     for contour in tumor_contours:
                         ax[j][i].plot(contour[:, 0], contour[:, 1],
                                       color=tumor_colors[k], linewidth=1.1)
-                
+
                 # plot simulated tumor density
                 u_sl = u[sl].squeeze()
                 u_sl = np.ma.masked_where(u_sl < 1e-4, u_sl)
                 rgba_u = np.zeros((u_sl.T.shape[0], u_sl.T.shape[1], 4))
                 rgba_u[..., 0] = 1.0  # red
-                rgba_u[..., 3] = np.sqrt(u_sl.T) * 0.3  # transparency 
+                rgba_u[..., 3] = np.sqrt(u_sl.T) * 0.3  # transparency
                 ax[j][i].imshow(rgba_u, vmin=0., vmax=1.)
 
                 # plot thresholded contour
                 u_contours = measure.find_contours(u_sl, level=0.3)
                 for contour in u_contours:
-                    ax[j][i].plot(contour[:, 0], contour[:, 1], color='red', linewidth=1.1)
+                    ax[j][i].plot(contour[:, 0], contour[:, 1],
+                                  color='red', linewidth=1.1)
 
-                ax[j][i].invert_yaxis()  # invert y-axis to match image coordinate system (origin at top-left)
+                # invert y-axis to match image coordinate system (origin at top-left)
+                ax[j][i].invert_yaxis()
                 ax[j][i].set_title(f"Slice {slice_fracs[j][i]}")
 
         # Add a main title to all plots
@@ -238,10 +245,12 @@ def visualize_model_fit(
     if not isinstance(file_prefix, list):
         file_prefix = [file_prefix]
     if len(underlays) > 1 and len(file_prefix) == 1:
-        file_prefix = [str(file_prefix) + str(i+1) for i in range(len(underlays))]
+        file_prefix = [str(file_prefix) + str(i+1)
+                       for i in range(len(underlays))]
     elif len(underlays) != len(file_prefix):
-        raise ValueError("Number of underlays mush match the number of file name prefixs.")
-    
+        raise ValueError(
+            "Number of underlays mush match the number of file name prefixs.")
+
     time_info = f"t={round(t, 3)}"
 
     _vis_brain_scan(u, underlays, tumors, figsize, main_title, time_info,
@@ -266,9 +275,11 @@ def visualize_model_fit_multiscan(
     if not isinstance(file_prefix, list):
         file_prefix = [file_prefix]
     if len(underlays) > 1 and len(file_prefix) == 1:
-        file_prefix = [str(file_prefix) + str(i+1) for i in range(len(underlays))]
+        file_prefix = [str(file_prefix) + str(i+1)
+                       for i in range(len(underlays))]
     elif len(underlays) != len(file_prefix):
-        raise ValueError("Number of underlays mush match the number of file name prefixs.")
+        raise ValueError(
+            "Number of underlays mush match the number of file name prefixs.")
 
     if real_t_diff is None:
         time_unit = ""
@@ -280,8 +291,8 @@ def visualize_model_fit_multiscan(
         ndigits = 1
 
     time_info = f"t={round(t * time_scale, ndigits)} {time_unit}; " + \
-                f"t-t1={round((t - t_scan[0]) * time_scale, ndigits)} {time_unit}; " + \
-                f"t-t2={round((t - t_scan[1]) * time_scale, ndigits)} {time_unit}"
+        f"t-t1={round((t - t_scan[0]) * time_scale, ndigits)} {time_unit}; " + \
+        f"t-t2={round((t - t_scan[1]) * time_scale, ndigits)} {time_unit}"
 
     _vis_brain_scan(u, underlays, tumors, figsize, main_title, time_info,
                     show=show, file_prefix=file_prefix, save_dir=save_dir, idx=idx)

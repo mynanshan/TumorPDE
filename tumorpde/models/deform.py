@@ -142,7 +142,7 @@ class TumorDeformFD(TumorVarFieldBase):
         kappa_ratios = torch.as_tensor(kappa_ratios, **self.factory_args)
         init_params = self.init_learnable_params.clone()
 
-        # parameters indexes:
+        # parameter indexes:
         # 0 - D
         # 1 - alpha
         # 2 - M
@@ -150,92 +150,63 @@ class TumorDeformFD(TumorVarFieldBase):
         # 4:4+nparam_init - init_params
         # 4+nparam_init:4+nparam_init+1 - D_ratio
         # 4+nparam_init+1:4+nparam_init+3 - kappa_ratios
-        parameters = self._format_parameters(
+        params = self._format_parameters(
             D, alpha, M, kappa,
             D_ratio, kappa_ratios,
             init_params
         )
-        self._set_parameters(parameters)
+        self._set_parameters(params)
 
         # Whether to estimate the ratios
         self.estimate_ratios = estimate_ratios
-    
-    def _set_parameters(self, parameters: Tensor):
-
-        self.parameters = parameters.flatten()
-        assert self.parameters.numel() == self.nparam
-
-        # Settings for the training process
-        # parameters with proper resizing are called working parameters
-        self.rescale_params = False
-        self.wkparams_min = torch.cat([
-            torch.tensor([1e-4] * 4, **self.factory_args),
-            self.init_param_min.view(-1).clone(),
-            torch.tensor([1e-4] * 3, **self.factory_args)])
-        self.wkparams_max = torch.cat([
-            1e3 * self.D.view(-1).clone(),
-            1e3 * self.alpha.view(-1).clone(),
-            1e3 * self.M.view(-1).clone(),
-            1e3 * self.kappa.view(-1).clone(),
-            self.init_param_max.view(-1).clone(),
-            torch.tensor([1.] * 3, **self.factory_args)])
-        self.wkparams_scale = torch.cat([
-            self.D.view(-1).clone(),
-            self.alpha.view(-1).clone(),
-            self.M.view(-1).clone(),
-            self.kappa.view(-1).clone(),
-            (self.init_param_max - self.init_param_min).view(-1).clone(),
-            torch.tensor([1.] * 3, **self.factory_args)])
-        # NOTE: there's no need to use the name "wkparams" for working parametrs.
-        # Should be just params. Consider renaming it in the future.
 
     @property
-    def D(self):
+    def D(self) -> Tensor:
         return self._D(self.parameters)
 
-    def _D(self, params):
+    def _D(self, params) -> Tensor:
         return params[0]
 
     @property
-    def alpha(self):
+    def alpha(self) -> Tensor:
         return self._alpha(self.parameters)
 
-    def _alpha(self, params):
+    def _alpha(self, params) -> Tensor:
         return params[1]
 
     @property
-    def M(self):
+    def M(self) -> Tensor:
         return self._M(self.parameters)
 
-    def _M(self, params):
+    def _M(self, params) -> Tensor:
         return params[2]
 
     @property
-    def kappa(self):
+    def kappa(self) -> Tensor:
         return self._kappa(self.parameters)
 
-    def _kappa(self, params):
+    def _kappa(self, params) -> Tensor:
         return params[3]
 
     @property
-    def init_params(self):
+    def init_params(self) -> Tensor:
         return self._init_params(self.parameters)
 
-    def _init_params(self, params):
+    def _init_params(self, params) -> Tensor:
         return params[4:4+self.nparam_init]
 
     @property
-    def D_ratio(self):
+    def D_ratio(self) -> Tensor:
         return self._D_ratio(self.parameters)
 
-    def _D_ratio(self, params):
+    def _D_ratio(self, params) -> Tensor:
         return params[4+self.nparam_init:4+self.nparam_init+1]
 
     @property
-    def kappa_ratios(self):
+    def kappa_ratios(self) -> Tensor:
         return self._kappa_ratios(self.parameters)
 
-    def _kappa_ratios(self, params):
+    def _kappa_ratios(self, params) -> Tensor:
         return params[4+self.nparam_init+1:4+self.nparam_init+3]
 
     def _format_parameters(self,
@@ -245,21 +216,49 @@ class TumorDeformFD(TumorVarFieldBase):
                            kappa: Optional[Tensor] = None,
                            D_ratio: Optional[Tensor] = None,
                            kappa_ratios: Optional[Tensor] = None,
-                           init_params: Optional[Tensor] = None):
-        D = D if D is not None else self.D
-        alpha = alpha if alpha is not None else self.alpha
-        M = M if M is not None else self.M
-        kappa = kappa if kappa is not None else self.kappa
-        D_ratio = D_ratio if D_ratio is not None else self.D_ratio
-        kappa_ratios = kappa_ratios if kappa_ratios is not None else self.kappa_ratios
-        init_params = init_params if init_params is not None else self.init_params
-        parameters = torch.cat([
+                           init_params: Optional[Tensor] = None) -> Tensor:
+        D = torch.as_tensor(D, **self.factory_args) if D is not None else self.D
+        alpha = torch.as_tensor(alpha, **self.factory_args) if alpha is not None else self.alpha
+        M = torch.as_tensor(M, **self.factory_args) if M is not None else self.M
+        kappa = torch.as_tensor(kappa, **self.factory_args) if kappa is not None else self.kappa
+        D_ratio = torch.as_tensor(D_ratio, **self.factory_args) if D_ratio is not None else self.D_ratio
+        kappa_ratios = torch.as_tensor(kappa_ratios, **self.factory_args) if kappa_ratios is not None else self.kappa_ratios
+        init_params = torch.as_tensor(init_params, **self.factory_args) if init_params is not None else self.init_params
+        params = torch.cat([
             D.view(-1), alpha.view(-1),
             M.view(-1), kappa.view(-1),
             init_params.view(-1),
             D_ratio.view(-1), kappa_ratios.view(-1)
         ], dim=0)
-        return parameters
+        assert params.numel() == self.nparam
+        return params
+
+    def _set_parameters(self, params: Tensor):
+
+        self.parameters = params.flatten()
+        assert self.parameters.numel() == self.nparam
+
+        # Settings for the training process
+        # parameters with proper resizing are called working parameters
+        self.rescale_params = False
+        self.params_min = torch.cat([
+            torch.tensor([1e-4] * 4, **self.factory_args),
+            self.init_param_min.view(-1).clone(),
+            torch.tensor([1e-4] * 3, **self.factory_args)])
+        self.params_max = torch.cat([
+            1e3 * self.D.view(-1).clone(),
+            1e3 * self.alpha.view(-1).clone(),
+            1e3 * self.M.view(-1).clone(),
+            1e3 * self.kappa.view(-1).clone(),
+            self.init_param_max.view(-1).clone(),
+            torch.tensor([1.] * 3, **self.factory_args)])
+        self.params_scale = torch.cat([
+            self.D.view(-1).clone(),
+            self.alpha.view(-1).clone(),
+            self.M.view(-1).clone(),
+            self.kappa.view(-1).clone(),
+            (self.init_param_max - self.init_param_min).view(-1).clone(),
+            torch.tensor([1.] * 3, **self.factory_args)])
 
     def _spec_dt(self, dt: float, t_span: float,
                  dx: List[float], D: float, vmax: float) -> float:
@@ -288,7 +287,7 @@ class TumorDeformFD(TumorVarFieldBase):
               verbose=True):
 
         # parameters
-        parameters = self._format_parameters(
+        params = self._format_parameters(
             D, alpha, M, kappa,
             D_ratio, kappa_ratios,
             init_params)
@@ -302,7 +301,7 @@ class TumorDeformFD(TumorVarFieldBase):
 
         # initialization
         if state is None:
-            state = self.init_state(self._init_params(parameters))
+            state = self.init_state(self._init_params(params))
         assert isinstance(state, TumorBrainDeformState)
 
         # forward
@@ -311,7 +310,7 @@ class TumorDeformFD(TumorVarFieldBase):
         # TODO: adapt dt dynamically
         while (ti < t1):
             dt = self._spec_dt(dt, t_span, self.dx.tolist(),
-                               self._D(parameters).item(),
+                               self._D(params).item(),
                                torch.max(torch.abs(state.deform_velocity)).item())
             if dt < dt0 / 100:
                 dt = dt0 / 100
@@ -320,7 +319,7 @@ class TumorDeformFD(TumorVarFieldBase):
             ti += dt
             t.append(ti)
 
-            self.forward_update(state, dt, parameters)
+            self.forward_update(state, dt, params)
 
         return state, t
 
@@ -343,21 +342,21 @@ class TumorDeformFD(TumorVarFieldBase):
     def forward_update(self,
                        state: TumorBrainDeformState,
                        dt: float,
-                       parameters: Tensor | None) -> None:
-        if parameters is not None:
-            parameters = self.parameters
+                       params: Tensor | None) -> None:
+        if params is not None:
+            params = self.parameters
         self._forward_update(dt,
                              state.tumor_density,
                              state.brain_density,
                              state.brain_proportion,
                              state.deform_velocity,
                              state.pressure_field,
-                             self._D(parameters),
-                             self._alpha(parameters),
-                             self._M(parameters),
-                             self._kappa(parameters),
-                             self._D_ratio(parameters),
-                             self._kappa_ratios(parameters))
+                             self._D(params),
+                             self._alpha(params),
+                             self._M(params),
+                             self._kappa(params),
+                             self._D_ratio(params),
+                             self._kappa_ratios(params))
 
     def _forward_update(self, dt: float,
                         u: Tensor, rho: Tensor,
@@ -414,17 +413,17 @@ class TumorDeformFD(TumorVarFieldBase):
                 # Upwind scheme for advection term
                 v_pos = torch.where(v[i][c_sl] > 0, 1, 0)
                 v_neg = 1 - v_pos
-                
+
                 # Advection term: -v * ∂rho/∂x
                 drho_dx = (v_pos * (rho[s][c_sl] - rho[s][m_sl[i]]) / self.dx[i] +
                         v_neg * (rho[s][p_sl[i]] - rho[s][c_sl]) / self.dx[i])
-        
+
                 # Convection term: -rho * ∂v/∂x
                 dv_dx = (v[i][p_sl[i]] - v[i][m_sl[i]]) / (2 * self.dx[i])
-                
+
                 drho_dt[s][c_sl] -= v[i][c_sl] * drho_dx + rho[s][c_sl] * dv_dx
 
-            # update brain tissue 
+            # update brain tissue
             rho[s][c_sl] += dt * drho_dt[s][c_sl]
             rho[s].mul_(self.domain_mask)
 
@@ -433,7 +432,7 @@ class TumorDeformFD(TumorVarFieldBase):
             mass_loss = torch.sum(rho[s] - rho_positive)
             rho[s] = rho_positive + \
                 mass_loss / torch.sum(self.domain_mask) * self.domain_mask  # Redistribute lost mass
-            
+
             # boundary conditions
             self.pad_boundary(rho[s])
 

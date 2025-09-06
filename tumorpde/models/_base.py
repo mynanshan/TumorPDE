@@ -12,6 +12,7 @@ from tumorpde.volume_domain import VolumeDomain
 from tumorpde._typing import TensorLikeFloat
 from tumorpde.calc.dist_boundary import signed_distance_and_nearest_index
 
+from tumorpde.calc.loss import empty_loss_deriv, mse_loss, deriv_mse_loss
 
 
 def default_init_density(x: Tensor, x0: Tensor,
@@ -71,6 +72,13 @@ def empty_init_density_deriv(
     return torch.empty((0, *x.shape), device=x.device, dtype=x.dtype)
 
 
+def default_loss_func(x: Tensor, y: Tensor) -> Tensor:
+    return mse_loss(x, y)
+
+def default_loss_deriv(x: Tensor, y: Tensor) -> Tensor:
+    return deriv_mse_loss(x, y)
+
+
 class TumorBase(ABC):
 
     def __init__(self, domain: VolumeDomain,
@@ -80,6 +88,9 @@ class TumorBase(ABC):
                  init_density_deriv: Optional[Callable] = None,
                  init_param_min: Optional[TensorLikeFloat] = None,
                  init_param_max: Optional[TensorLikeFloat] = None,
+                 loss_func: Optional[Callable] = None,
+                 loss_other_params: Optional[Dict] = None,
+                 loss_deriv: Optional[Callable] = None,
                  autograd: bool = False,
                  dtype: torch.dtype = torch.float32,
                  device: torch.device = torch.device('cpu')):
@@ -140,14 +151,49 @@ class TumorBase(ABC):
         # Using autograd for param estimation?
         self.auto_grad = autograd
 
+        # Set init condition functions
+        self.compile_init(init_density_func,
+                          init_learnable_params,
+                          init_other_params,
+                          init_density_deriv,
+                          init_param_min,
+                          init_param_max)
+
+        # Set loss functions
+        self.compile_loss(loss_func, loss_other_params, loss_deriv)
+
+        # Parameters
+        # indexes
+        # 0:nparam_init
+        # nparam_init:nparam_init+nparam_loss
+        self.param_names = []  # parameters used to define PDEs
+        self.nparam_main = len(self.param_names)
+        self.parameters = self._format_parameters(init_params=self.init_learnable_params)
+        self.rescale_params = False
+        self.params_min = self.init_param_min.view(-1).clone()
+        self.params_max = self.init_param_max.view(-1).clone()
+        self.params_scale = (self.init_param_max - self.init_param_min).view(-1).clone()
+
+    def compile_init(
+        self,
+        init_density_func: Optional[Callable] = None,
+        init_learnable_params: Optional[TensorLikeFloat] = None,
+        init_other_params: Optional[Dict] = None,
+        init_density_deriv: Optional[Callable] = None,
+        init_param_min: Optional[TensorLikeFloat] = None,
+        init_param_max: Optional[TensorLikeFloat] = None,
+        deriv_free: bool = False
+    ):
         # Initial state and its parameter settings
         if init_density_func is None:
+            # default: Gaussian density concentrated around an initial point
+            # The initial location is learned through optimization
             self.init_density = default_init_density
-            self.init_density_deriv = default_init_density_deriv
+            self.init_density_deriv = default_init_density_deriv if not deriv_free else empty_init_density_deriv
             if init_learnable_params is None:
-                init_learnable_params = self.domain.bbox_widths / 2,
-            self.init_learnable_params = torch.tensor(init_learnable_params,
-                                                      **self.factory_args, requires_grad=autograd)
+                init_learnable_params = self.domain.bbox_widths / 2
+            self.init_learnable_params = \
+                torch.tensor(init_learnable_params, **self.factory_args, requires_grad=self.auto_grad)
             assert self.init_learnable_params.numel() == self.dim
             if init_other_params is not None:
                 assert isinstance(init_other_params, dict)
@@ -165,9 +211,9 @@ class TumorBase(ABC):
         else:
             self.init_density = init_density_func
             if init_learnable_params is None:
-               init_learnable_params = [] 
+               init_learnable_params = []
             self.init_learnable_params = torch.tensor(
-                init_learnable_params, **self.factory_args, requires_grad=autograd)
+                init_learnable_params, **self.factory_args, requires_grad=self.auto_grad)
             self.nparam_init = self.init_learnable_params.numel()
             self.init_other_params = dict(init_other_params) if init_other_params is not None else {}
             self.init_param_min = torch.as_tensor(init_param_min, **self.factory_args) \
@@ -178,28 +224,61 @@ class TumorBase(ABC):
                 if self.init_param_min.numel() != self.nparam_init or \
                     self.init_param_max.numel() != self.nparam_init:
                     raise ValueError("Length of init_param_min/mas should equal the number of learnable init parameters")
-                if init_density_deriv is None:
-                    raise ValueError("init_density_deriv cannot be None if there are learnable parameters")
-            else:
-                if init_density_deriv is None:
+            if init_density_deriv is None:
+                if (not deriv_free) and (self.nparam_init != 0):
+                    raise ValueError("""init_density_deriv cannot be None if
+                                     learnable parameters exist and derivative-based algorithm is used""")
+                else:
                     self.init_density_deriv = empty_init_density_deriv
-            if init_density_deriv is not None:
+            else:
                 self.init_density_deriv = init_density_deriv
-        # TODO: claim the type of init_density_deriv
+    
+    def compile_loss(self,
+        loss_func: Optional[Callable] = None,
+        loss_other_params: Optional[Dict] = None,
+        loss_deriv: Optional[Callable] = None
+    ):
+        if loss_func is None:
+            # default choice: MSE loss
+            self.loss_func = default_loss_func
+            self.loss_deriv = default_loss_deriv
+            self.loss_other_params = {}
+        else:
+            self.loss_func = loss_func
+            if loss_deriv is None:
+                raise ValueError("loss_deriv cannot be None if loss_func is provided")
+            else:
+                self.loss_deriv = loss_deriv
+            self.loss_other_params = dict(loss_other_params) if loss_other_params is not None else {}
 
-        # parameters
-        self.nparam = self.nparam_init
-        self.parameters = self.init_learnable_params.view(-1).clone().to(**self.factory_args)
-        self.wkparams_min = self.init_param_min.view(-1).clone().to(**self.factory_args)
-        self.wkparams_max = self.init_param_max.view(-1).clone().to(**self.factory_args)
-        self.wkparams_scale = (self.init_param_max - self.init_param_min).view(-1).clone().to(**self.factory_args)
+    def _format_parameters(self, **kwargs) -> Tensor:
+        """Helper function to format parameters into a vector"""
+        params = []
+        for name, value in kwargs.items():
+            if name not in self.param_names and name != "init_params":
+                raise ValueError(f"Parameter '{name}' is not a valid parameter name")
+            if value is None:
+                params.append(getattr(self, name))
+            elif not isinstance(value, (Tensor, np.ndarray, float)) and \
+               not ((isinstance(value, (list, tuple)) and all(isinstance(x, float) for x in value))):
+                raise TypeError(f"Parameter '{name}' is not a torch.Tensor or a list of float")
+            else:
+                params.append(torch.as_tensor(value, **self.factory_args).reshape(-1))
+        
+        # Concatenate along the only dimension
+        if params:
+            return torch.cat([p.view(-1) for p in params], dim=0)
+        else:
+            # No tensors passed: return an empty tensor
+            return torch.tensor([], **self.factory_args)
 
-    def _clip_state(self, u: Tensor) -> None:
-        u.clamp_(0.0, 1.0)
+    @abstractmethod
+    def _set_parameters(self, params: Tensor):
+        """Set self.parameters, its min, max, and scale"""
 
-    def _loss_func(self, u: Tensor, obs: Tensor) -> Tensor:
-        # TODO: allow logit type loss
-        return 0.5 * torch.mean((u - obs)**2)
+    @property
+    def nparam(self):
+        return self.nparam_main + self.nparam_init
 
     @property
     def init_params(self):
@@ -216,13 +295,16 @@ class TumorBase(ABC):
 
     def _to_working_params(self, params: Tensor) -> Tensor:
         """ Convert params from original scale to the working scale"""
-        wkparams = (params - self.wkparams_min) / self.wkparams_scale
+        wkparams = (params - self.params_min) / self.params_scale
         return wkparams
 
     def _to_original_params(self, wkparams: Tensor) -> Tensor:
         """ Convert working parameters to their original scale"""
-        params = wkparams * self.wkparams_scale + self.wkparams_min
+        params = wkparams * self.params_scale + self.params_min
         return params
+
+    def _clip_state(self, u: Tensor) -> None:
+        u.clamp_(0.0, 1.0)
 
 class TumorFixedFieldBase(TumorBase):
 
@@ -233,20 +315,29 @@ class TumorFixedFieldBase(TumorBase):
                  init_density_deriv: Optional[Callable] = None,
                  init_param_min: Optional[TensorLikeFloat] = None,
                  init_param_max: Optional[TensorLikeFloat] = None,
+                 loss_func: Optional[Callable] = None,
+                 loss_other_params: Optional[Dict] = None,
+                 loss_deriv: Optional[Callable] = None,
                  autograd: bool = False,
                  dtype: torch.dtype = torch.float32,
                  device: torch.device = torch.device('cpu')):
         """
         Args: Same as TumorBase
         """
-        super().__init__(domain, init_density_func, init_learnable_params,
-                         init_other_params, init_density_deriv,
+        super().__init__(domain,
+                         init_density_func,
+                         init_learnable_params,
+                         init_other_params,
+                         init_density_deriv,
                          init_param_min, init_param_max,
+                         loss_func, loss_other_params, loss_deriv,
                          autograd, dtype, device)
 
         self.diff_map = torch.as_tensor(domain.voxel, **self.factory_args)
         self.diff_map_aux = _fd_auxiliaries(self.diff_map)
 
+
+# TODO: TumorVarFieldBase, allow an undetermined number of brain tissues
 
 class TumorVarFieldBase(TumorBase):
 
@@ -259,6 +350,9 @@ class TumorVarFieldBase(TumorBase):
                  init_density_deriv: Optional[Callable] = None,
                  init_param_min: Optional[TensorLikeFloat] = None,
                  init_param_max: Optional[TensorLikeFloat] = None,
+                 loss_func: Optional[Callable] = None,
+                 loss_other_params: Optional[Dict] = None,
+                 loss_deriv: Optional[Callable] = None,
                  autograd: bool = False,
                  dtype: torch.dtype = torch.float32,
                  device: torch.device = torch.device('cpu')):
@@ -268,9 +362,11 @@ class TumorVarFieldBase(TumorBase):
             matters: three brain matters (gm, wm, csf) with deformable shapes
         Other parameters are the same
         """
-        super().__init__(domain, init_density_func, init_learnable_params,
+        super().__init__(domain,
+                         init_density_func, init_learnable_params,
                          init_other_params, init_density_deriv,
                          init_param_min, init_param_max,
+                         loss_func, loss_other_params, loss_deriv,
                          autograd, dtype, device)
 
         self.matters = torch.as_tensor(matters, dtype=dtype)
@@ -288,8 +384,8 @@ class TumorVarFieldBase(TumorBase):
         # indexing in-domain grid points, -1 for out-of-domain points
         self.interior_indices = -torch.ones(*self.nx, dtype=torch.long, device=device)
         self.interior_indices[self.domain_mask] = torch.arange(
-            self.domain_mask.sum().item()).to(dtype=torch.long, device=device) 
-        
+            self.domain_mask.sum().item()).to(dtype=torch.long, device=device)
+
         # boundary mask and the coordinates
         self.boundary_mask = torch.tensor(self.domain.boundary_mask, dtype=torch.bool, device=device)
         self.boundary_coords = torch.where(self.boundary_mask)
@@ -307,7 +403,7 @@ class TumorVarFieldBase(TumorBase):
             torch.sign(bnd_coord - in_coord) for bnd_coord, in_coord in \
                 zip(self.boundary_coords, self.boundary_nearest_coords)
         )
-    
+
     def pad_boundary(self, u: Tensor) -> None:
         """
         Pad the boundary of the input tensor u with the values of its nearest in-domain neighbour.

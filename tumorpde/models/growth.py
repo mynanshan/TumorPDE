@@ -2,8 +2,8 @@ from typing import Optional, Callable, Dict, Any, Literal, Tuple, List
 
 import numpy as np
 import torch
-from torch import Tensor
-from torch.nn import Parameter
+from torch import Tensor, autograd
+# from torch.nn import Parameter
 from scipy.optimize import minimize
 from tqdm import tqdm
 import nibabel as nib
@@ -29,6 +29,10 @@ class TumorInfiltraFD(TumorFixedFieldBase):
                  init_density_deriv: Optional[Callable] = None,
                  init_param_min: Optional[TensorLikeFloat] = None,
                  init_param_max: Optional[TensorLikeFloat] = None,
+                 loss_func: Optional[Callable] = None,
+                 loss_other_params: Optional[Dict] = None,
+                 loss_deriv: Optional[Callable] = None,
+                 autograd: bool = False,
                  dtype: torch.dtype = torch.float32,
                  device: torch.device = torch.device('cpu')):
         """
@@ -58,81 +62,61 @@ class TumorInfiltraFD(TumorFixedFieldBase):
                          init_density_func, init_learnable_params,
                          init_other_params, init_density_deriv,
                          init_param_min, init_param_max,
-                         False, dtype, device)
+                         loss_func, loss_other_params, loss_deriv,
+                         autograd, dtype, device)
 
         # Parameters
-        self.nparam_main = 2
-        self.nparam = self.nparam_main + self.nparam_init
+        self.param_names = ["D", "alpha"]
+        self.nparam_main = len(self.param_names)
 
-        D = torch.as_tensor(D, **self.factory_args)
-        alpha = torch.as_tensor(alpha, **self.factory_args)
-        init_params = self.init_learnable_params.clone()
-        self.parameters = torch.cat(
-            [D.view(-1), alpha.view(-1), init_params.view(-1)], dim=0)
-
-        # Settings for the training process
-        # parameters with proper resizing are called working parameters
-        self.wkparams_min = torch.cat([
-            torch.tensor([1e-4, 1e-4], **self.factory_args),
-            self.init_param_min.view(-1).clone()])
-        self.wkparams_max = torch.cat([
-            1e3 * D.view(-1).clone(),
-            1e3 * alpha.view(-1).clone(),
-            self.init_param_max.view(-1).clone()])
-        self.wkparams_scale = torch.cat([
-            D.view(-1).clone(),
-            alpha.view(-1).clone(),
-            (self.init_param_max - self.init_param_min).view(-1).clone()])
+        # parameter indexes
+        # 0 - D
+        # 1 - alpha
+        # 2:2+nparam_init
+        params = self._format_parameters(
+            D=D, alpha=alpha, init_params=self.init_learnable_params)
+        self._set_parameters(params)
 
     @property
-    def D(self):
+    def D(self) -> Tensor:
         return self._D(self.parameters)
 
-    def _D(self, params):
+    def _D(self, params) -> Tensor:
         return params[0]
 
     @property
-    def alpha(self):
+    def alpha(self) -> Tensor:
         return self._alpha(self.parameters)
 
-    def _alpha(self, params):
+    def _alpha(self, params) -> Tensor:
         return params[1]
 
     @property
-    def init_params(self):
+    def init_params(self) -> Tensor:
         return self._init_params(self.parameters)
 
-    def _init_params(self, params):
-        return params[2:]
+    def _init_params(self, params) -> Tensor:
+        return params[2:2+self.nparam_init]
 
-    def _format_parameters(self, D: Optional[TensorLikeFloat] = None,
-                           alpha: Optional[TensorLikeFloat] = None,
-                           init_params: Optional[TensorLikeFloat] = None) -> Tensor:
-        """ Helper function to format a new set parameters.
-        If all None, return the current parameters. """
-        D = self.D if D is None else torch.as_tensor(D, **self.factory_args)
-        alpha = self.alpha if alpha is None else torch.as_tensor(alpha, **self.factory_args)
-        init_params = self.init_params if init_params is None else torch.as_tensor(init_params, **self.factory_args)
-        params = torch.cat(
-            [D.view(-1), alpha.view(-1), init_params.view(-1)], dim=0)
-        assert params.numel() == self.nparam
-        return params
+    def _set_parameters(self, params: Tensor):
 
-    # def _update_parameters(self, params: Tensor) -> None:
-    #     """ Update the parameters. """
-    #     assert params.numel() == self.nparam
-    #     self.parameters = params.view(-1)
+        self.parameters = params.flatten()
+        assert self.parameters.numel() == self.nparam
 
-    # def _to_working_params(self, params: Tensor) -> Tensor:
-    #     """ Convert params from original scale to the working scale"""
-    #     wkparams = (params - self.wkparams_min) / self.wkparams_scale
-    #     return wkparams
-
-    # def _to_original_params(self, wkparams: Tensor) -> Tensor:
-    #     """ Convert working parameters to their original scale"""
-    #     params = wkparams * self.wkparams_scale + \
-    #         self.wkparams_min
-    #     return params
+        # Settings for the training process
+        # parameters with proper resizing are called working parameters
+        self.rescale_params = False
+        self.params_min = torch.cat([
+            torch.tensor([1e-4] * 2, **self.factory_args),
+            self.init_param_min.view(-1).clone()])
+        self.params_max = torch.cat([
+            1e3 * self.D.view(-1).clone(),
+            1e3 * self.alpha.view(-1).clone(),
+            self.init_param_max.view(-1).clone()])
+        self.params_scale = torch.cat([
+            self.D.view(-1).clone(),
+            self.alpha.view(-1).clone(),
+            (self.init_param_max - self.init_param_min).view(-1).clone()])
 
     def solve(self, dt: float = 0.01, t1: float = 1.,
               D: Optional[TensorLikeFloat] = None, alpha: Optional[TensorLikeFloat] = None,
@@ -149,7 +133,7 @@ class TumorInfiltraFD(TumorFixedFieldBase):
         # settings
         dt = float(dt)
         t1 = float(t1)
-        params = self._format_parameters(D, alpha, init_params)
+        params = self._format_parameters(D=D, alpha=alpha, init_params=init_params)
         D = self._D(params)
         alpha = self._alpha(params)
         init_params = self._init_params(params)
@@ -191,9 +175,9 @@ class TumorInfiltraFD(TumorFixedFieldBase):
                 plot_func(u, i, curr_t, **plot_args)
 
             if save_dir is not None and i % save_period == 0:
-                nifti_data = nib.Nifti1Image(
+                nifti_data = nib.nifti1.Nifti1Image(
                     u.detach().cpu().numpy(), save_args['affine'], save_args['header'])
-                nib.save(nifti_data, f"{save_dir}/{save_args['patient']}-i{i}.nii.gz")
+                nib.nifti1.save(nifti_data, f"{save_dir}/{save_args['patient']}-i{i}.nii.gz")
 
         return u, torch.linspace(t0, t1, nt), u_hist
 
@@ -211,7 +195,7 @@ class TumorInfiltraFD(TumorFixedFieldBase):
                         init_params: Optional[TensorLikeFloat] = None) -> Tuple[Tensor, Tensor, Tensor]:
 
         # settings
-        params = self._format_parameters(D, alpha, init_params)
+        params = self._format_parameters(D=D, alpha=alpha, init_params=init_params)
         D = self._D(params)
         alpha = self._alpha(params)
         init_params = self._init_params(params)
@@ -287,15 +271,15 @@ class TumorInfiltraFD(TumorFixedFieldBase):
     def _sensitivities_to_grads(
             self, u: Tensor, phi: Tensor, psi: Tensor,
             eta: Optional[Tensor], obs: Tensor) -> Tensor:
-        resid = u - obs
+        dloss = self.loss_deriv(u, obs, **self.loss_other_params)
         if eta is not None:
             grads = (
-                torch.mean(resid * phi), torch.mean(resid * psi),
-                torch.mean(resid * eta, dim=tuple(range(1, self.dim+1)))
+                torch.sum(dloss * phi), torch.sum(dloss * psi),
+                torch.sum(dloss * eta, dim=tuple(range(1, self.dim+1)))
             )
         else:
             grads = (
-                torch.mean(resid * phi), torch.mean(resid * psi)
+                torch.sum(dloss * phi), torch.sum(dloss * psi)
             )
         return torch.cat([g.view(-1) for g in grads]).to(**self.factory_args)
 
@@ -305,8 +289,8 @@ class TumorInfiltraFD(TumorFixedFieldBase):
         params = self._to_original_params(wkparams)
         u, _, grads = self.solve_with_grad(
             obs, dt, t1, self._D(params), self._alpha(params), self._init_params(params))
-        grads *= self.wkparams_scale
-        return self._loss_func(u, obs), grads
+        grads *= self.params_scale
+        return self.loss_func(u, obs, **self.loss_other_params), grads
 
     def check_gradients(
             self, obs: Tensor, dt: float = 0.01, t1: float = 1.,
@@ -315,7 +299,7 @@ class TumorInfiltraFD(TumorFixedFieldBase):
             init_params: Optional[TensorLikeFloat] = None,
             epsilon: float = 1e-6) -> None:
 
-        params = self._format_parameters(D, alpha, init_params)
+        params = self._format_parameters(D=D, alpha=alpha, init_params=init_params)
         wkparams = self._to_working_params(params)
 
         _, grads = self._calibrate_loss_grads(
@@ -384,8 +368,8 @@ class TumorInfiltraFD(TumorFixedFieldBase):
             return loss.item(), grads_np
 
         params_bound = list(zip(
-            self.wkparams_min.cpu().numpy(),
-            self.wkparams_max.cpu().numpy()))
+            self.params_min.cpu().numpy(),
+            self.params_max.cpu().numpy()))
 
         result = minimize(loss_func, wkparams_np, method=method,
                           jac=use_grad, bounds=params_bound, tol=1e-8,
@@ -403,7 +387,8 @@ class TumorInfiltraFD(TumorFixedFieldBase):
         # format an output
         result = {
             "D": self._D(params), "alpha": self._alpha(params),
-            "init_params": self._init_params(params), "loss_history": loss_history
+            "init_params": self._init_params(params),
+            "loss_history": loss_history
         }
 
         return result
@@ -415,15 +400,15 @@ class TumorInfiltraFD(TumorFixedFieldBase):
     def _sensitivities_to_grads_multiscan(
             self, u_t: Tensor, phi_t: Tensor, psi_t: Tensor,
             eta_t: Optional[Tensor], obs: Tensor) -> Tensor:
-        resid = u_t - obs
+        dloss = self.loss_deriv(u_t, obs, **self.loss_other_params)
         if eta_t is not None:
             grads = (
-                torch.mean(resid * phi_t), torch.mean(resid * psi_t),
-                torch.mean(resid * eta_t, dim=tuple(range(1, self.dim+2)))
+                torch.sum(dloss * phi_t), torch.sum(dloss * psi_t),
+                torch.sum(dloss * eta_t, dim=tuple(range(1, self.dim+2)))
             )
         else:
             grads = (
-                torch.mean(resid * phi_t), torch.mean(resid * psi_t)
+                torch.sum(dloss * phi_t), torch.sum(dloss * psi_t)
             )
         return torch.cat([g.view(-1) for g in grads]).to(**self.factory_args)
 
@@ -433,7 +418,7 @@ class TumorInfiltraFD(TumorFixedFieldBase):
             init_params: Optional[NDArrayLikeFloat] = None) -> Tuple[Tensor, List[float], Tensor, Tensor]:
 
         # settings
-        params = self._format_parameters(D, alpha, init_params)
+        params = self._format_parameters(D=D, alpha=alpha, init_params=init_params)
         D = self._D(params)
         alpha = self._alpha(params)
         init_params = self._init_params(params)
@@ -517,7 +502,7 @@ class TumorInfiltraFD(TumorFixedFieldBase):
         # grad and loss
         loss = torch.tensor(0., **self.factory_args)
         for k in range(nscan):
-            loss += self._loss_func(u_t[k], obs[k])
+            loss += self.loss_func(u_t[k], obs[k], **self.loss_other_params)
         grads = self._sensitivities_to_grads_multiscan(
             u_t, phi_t, psi_t, eta_t, obs)
 
@@ -529,7 +514,7 @@ class TumorInfiltraFD(TumorFixedFieldBase):
         params = self._to_original_params(wkparams)
         _, t_scan, loss, grads = self.solve_with_grad_multiscan(
             obs, dt, t1, self._D(params), self._alpha(params), self._init_params(params))
-        grads *= self.wkparams_scale
+        grads *= self.params_scale
         return t_scan, loss, grads
 
     def calibrate_model_multiscan(
@@ -579,8 +564,8 @@ class TumorInfiltraFD(TumorFixedFieldBase):
             return loss.item(), grads_np
 
         params_bound = list(zip(
-            self.wkparams_min.cpu().numpy(),
-            self.wkparams_max.cpu().numpy()))
+            self.params_min.cpu().numpy(),
+            self.params_max.cpu().numpy()))
 
         result = minimize(loss_func, wkparams_np, method=method,
                           jac=use_grad, bounds=params_bound, tol=1e-8,
@@ -601,8 +586,7 @@ class TumorInfiltraFD(TumorFixedFieldBase):
         # format an output
         result = {
             "D": self._D(params), "alpha": self._alpha(params),
-            "init_params": self._init_params(params), "loss_history": loss_history,
-            "t_scan": t_scan
+            "init_params": self._init_params(params),
         }
 
         return result
